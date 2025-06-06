@@ -3,7 +3,7 @@
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, Timer
+from cocotb.triggers import ClockCycles, Timer, RisingEdge
 
 
 @cocotb.test()
@@ -46,16 +46,20 @@ async def test_counter(dut):
     test_value = 123
     dut._log.info(f"Before load: counter = {dut.uo_out.value}")
     
-    # Set signals and wait for them to propagate
+    # Set signals and ensure they are stable before clock edge
     dut.ui_in.value = test_value  # Set base count value
     dut.uio_in.value = 3  # Set both load (bit 0) and output enable (bit 1)
     
-    # Wait for signals to propagate in simulation
-    await Timer(10, units="ns")
+    # Wait for signals to propagate and stabilize
+    await Timer(100, units="ns")  # Longer wait
     dut._log.info(f"After signal setup: ui_in = {dut.ui_in.value}, uio_in = {dut.uio_in.value}")
     
-    # Wait for clock edge for load to take effect
-    await ClockCycles(dut.clk, 1)
+    # Wait for the next rising edge when load should occur
+    await RisingEdge(dut.clk)
+    dut._log.info(f"After rising edge: counter = {dut.uo_out.value}")
+    
+    # Wait one more delta cycle to see the result
+    await Timer(1, units="ns")
     dut._log.info(f"After load clock: counter = {dut.uo_out.value}")
     
     # Verify loaded value
@@ -95,10 +99,10 @@ async def test_counter(dut):
     dut.uio_in.value = 3  # Set load and output enable
     
     # Wait for signals to propagate
-    await Timer(10, units="ns")
+    await Timer(100, units="ns")
     dut._log.info(f"Overflow test signals: ui_in = {dut.ui_in.value}, uio_in = {dut.uio_in.value}")
     
-    await ClockCycles(dut.clk, 1)
+    await RisingEdge(dut.clk)
     
     # Verify loaded value
     assert dut.uo_out.value == 255, f"Load max value failed: counter = {dut.uo_out.value}, expected 255"
