@@ -4,14 +4,14 @@
 # defaults
 SIM ?= icarus
 TOPLEVEL_LANG ?= verilog
-SRC_DIR = $(PWD)/../src
+SRC_DIR := /Users/bryan/Library/CloudStorage/OneDrive-UniversityofWaterloo/Waterloo/2B/ECE\ 298A/src
 PROJECT_SOURCES = project.v counter_8bit.v
 
 ifneq ($(GATES),yes)
 
 # RTL simulation:
 SIM_BUILD				= sim_build/rtl
-VERILOG_SOURCES += $(addprefix $(SRC_DIR)/,$(PROJECT_SOURCES))
+VERILOG_SOURCES += ../src/project.v ../src/counter_8bit.v
 
 else
 
@@ -24,15 +24,15 @@ VERILOG_SOURCES += $(PDK_ROOT)/ihp-sg13g2/libs.ref/sg13g2_io/verilog/sg13g2_io.v
 VERILOG_SOURCES += $(PDK_ROOT)/ihp-sg13g2/libs.ref/sg13g2_stdcell/verilog/sg13g2_stdcell.v
 
 # this gets copied in by the GDS action workflow
-VERILOG_SOURCES += $(PWD)/gate_level_netlist.v
+VERILOG_SOURCES += gate_level_netlist.v
 
 endif
 
 # Allow sharing configuration between design and testbench via `include`:
-COMPILE_ARGS 		+= -I$(SRC_DIR)
+COMPILE_ARGS 		+= -I../src
 
 # Include the testbench sources:
-VERILOG_SOURCES += $(PWD)/tb.v
+VERILOG_SOURCES += tb.v
 TOPLEVEL = tb
 
 # MODULE is the basename of the Python test file
