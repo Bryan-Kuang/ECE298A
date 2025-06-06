@@ -44,11 +44,18 @@ async def test_counter(dut):
     # Test 3: Load functionality
     dut._log.info("Test 3: Load functionality")
     test_value = 123
+    dut._log.info(f"Before load: counter = {dut.uo_out.value}")
+    
+    # Set signals and wait for them to propagate
     dut.ui_in.value = test_value  # Set base count value
     dut.uio_in.value = 3  # Set both load (bit 0) and output enable (bit 1)
-    await ClockCycles(dut.clk, 1)
+    dut._log.info(f"Set ui_in = {dut.ui_in.value}, uio_in = {dut.uio_in.value}")
     
-    # Verify loaded value immediately after load clock cycle
+    # Wait for load to take effect on next clock edge
+    await ClockCycles(dut.clk, 1)
+    dut._log.info(f"After load clock: counter = {dut.uo_out.value}")
+    
+    # Verify loaded value
     assert dut.uo_out.value == test_value, f"Load failed: counter = {dut.uo_out.value}, expected {test_value}"
     
     dut.uio_in.value = 2  # Clear load, keep output enable
