@@ -47,10 +47,11 @@ async def test_counter(dut):
     dut.ui_in.value = test_value  # Set base count value
     dut.uio_in.value = 3  # Set both load (bit 0) and output enable (bit 1)
     await ClockCycles(dut.clk, 1)
-    dut.uio_in.value = 2  # Clear load, keep output enable
     
-    # Verify loaded value
+    # Verify loaded value immediately after load clock cycle
     assert dut.uo_out.value == test_value, f"Load failed: counter = {dut.uo_out.value}, expected {test_value}"
+    
+    dut.uio_in.value = 2  # Clear load, keep output enable
     
     # Test 4: Continued counting after load
     dut._log.info("Test 4: Continued counting after load")
@@ -83,10 +84,11 @@ async def test_counter(dut):
     dut.ui_in.value = 255
     dut.uio_in.value = 3  # Set load and output enable
     await ClockCycles(dut.clk, 1)
-    dut.uio_in.value = 2  # Clear load, keep output enable
     
     # Verify loaded value
     assert dut.uo_out.value == 255, f"Load max value failed: counter = {dut.uo_out.value}, expected 255"
+    
+    dut.uio_in.value = 2  # Clear load, keep output enable
     
     # Check overflow to 0
     await ClockCycles(dut.clk, 1)
