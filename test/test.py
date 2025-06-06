@@ -3,7 +3,7 @@
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles
+from cocotb.triggers import ClockCycles, Timer
 
 
 @cocotb.test()
@@ -51,7 +51,10 @@ async def test_counter(dut):
     dut.uio_in.value = 3  # Set both load (bit 0) and output enable (bit 1)
     dut._log.info(f"Set ui_in = {dut.ui_in.value}, uio_in = {dut.uio_in.value}")
     
-    # Wait for load to take effect on next clock edge
+    # Wait a small time for signals to propagate
+    await Timer(1, units="ns")
+    
+    # Wait for clock edge for load to take effect
     await ClockCycles(dut.clk, 1)
     dut._log.info(f"After load clock: counter = {dut.uo_out.value}")
     
