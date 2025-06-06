@@ -49,10 +49,10 @@ async def test_counter(dut):
     # Set signals and wait for them to propagate
     dut.ui_in.value = test_value  # Set base count value
     dut.uio_in.value = 3  # Set both load (bit 0) and output enable (bit 1)
-    dut._log.info(f"Set ui_in = {dut.ui_in.value}, uio_in = {dut.uio_in.value}")
     
-    # Wait a small time for signals to propagate
-    await Timer(1, units="ns")
+    # Wait for signals to propagate in simulation
+    await Timer(10, units="ns")
+    dut._log.info(f"After signal setup: ui_in = {dut.ui_in.value}, uio_in = {dut.uio_in.value}")
     
     # Wait for clock edge for load to take effect
     await ClockCycles(dut.clk, 1)
@@ -93,6 +93,11 @@ async def test_counter(dut):
     # Set counter to 255 (max 8-bit value)
     dut.ui_in.value = 255
     dut.uio_in.value = 3  # Set load and output enable
+    
+    # Wait for signals to propagate
+    await Timer(10, units="ns")
+    dut._log.info(f"Overflow test signals: ui_in = {dut.ui_in.value}, uio_in = {dut.uio_in.value}")
+    
     await ClockCycles(dut.clk, 1)
     
     # Verify loaded value
