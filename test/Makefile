@@ -5,13 +5,15 @@
 SIM ?= icarus
 TOPLEVEL_LANG ?= verilog
 SRC_DIR := /Users/bryan/Library/CloudStorage/OneDrive-UniversityofWaterloo/Waterloo/2B/ECE\ 298A/src
-PROJECT_SOURCES = project.v counter_8bit.v
+PROJECT_SOURCES = MAC_simple.v
 
 ifneq ($(GATES),yes)
 
 # RTL simulation:
 SIM_BUILD				= sim_build/rtl
-VERILOG_SOURCES += ../src/project.v ../src/counter_8bit.v
+# Simplified MAC module and dependency source files
+VERILOG_SOURCES += ../src/MAC_simple.v
+VERILOG_SOURCES += ../src/builtin_components/TC_Mul.v
 
 else
 
@@ -32,11 +34,11 @@ endif
 COMPILE_ARGS 		+= -I../src
 
 # Include the testbench sources:
-VERILOG_SOURCES += tb.v
-TOPLEVEL = tb
+VERILOG_SOURCES += tb_mac_simple.v
+TOPLEVEL = tb_mac_simple
 
 # MODULE is the basename of the Python test file
-MODULE = test
+MODULE = test_mac
 
 # include cocotb's make rules to take care of the simulator setup
 include $(shell cocotb-config --makefiles)/Makefile.sim
