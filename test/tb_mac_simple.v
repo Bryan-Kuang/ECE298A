@@ -14,7 +14,7 @@ module tb_mac_simple;
     reg ena;             // Enable signal
 
     // Instantiate TinyTapeout top module
-    tt_um_ARandomNam_mac_peripheral dut (
+    tt_um_ARandomNam_mac_peripheral_modular dut (
         .ui_in(ui_in),
         .uo_out(uo_out),
         .uio_in(uio_in),

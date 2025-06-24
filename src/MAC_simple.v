@@ -4,93 +4,85 @@ module MAC_simple (
     input wire Clear_and_Mult,
     input wire [7:0] Data_A,
     input wire [7:0] Data_B,
-    output reg [15:0] Output_2,  // 累加结果
-    output reg Output_1          // 溢出标志
+    output wire [15:0] Output_2,  // Accumulation result
+    output wire Output_1          // Overflow flag
 );
 
-    // 内部信号 - 两级流水线
-    reg [7:0] reg_A, reg_B;          // 第一级：输入寄存器
-    reg reg_Clear_and_Mult;          // 第一级：控制信号寄存器
-    reg reg_valid;                   // 第一级：有效信号
-    
-    reg [7:0] pipe_A, pipe_B;        // 第二级：流水线寄存器
-    reg pipe_Clear_and_Mult;         // 第二级：流水线控制信号
-    reg pipe_valid;                  // 第二级：流水线有效信号
-    
-    wire [15:0] mult_result;         // 乘法结果
-    reg [16:0] accumulator;          // 17位累加器 (包含溢出位)
-    wire [16:0] add_result;          // 加法结果
-    
-    // 检测输入变化 - 当输入发生变化时认为是新的有效操作
-    reg [7:0] last_A, last_B;
-    reg last_Clear_and_Mult;
+    // Internal interconnect signals
     wire input_changed;
     
-    assign input_changed = (Data_A != last_A) || (Data_B != last_B) || (Clear_and_Mult != last_Clear_and_Mult);
+    // First stage pipeline signals
+    wire [7:0] reg_A, reg_B;
+    wire reg_Clear_and_Mult;
+    wire reg_valid;
     
-    // 乘法器 - 使用第二级流水线的值
+    // Second stage pipeline signals
+    wire [7:0] pipe_A, pipe_B;
+    wire pipe_Clear_and_Mult;
+    wire pipe_valid;
+    
+    // Multiplier output
+    wire [15:0] mult_result;
+    
+    // Accumulator signals
+    wire [16:0] accumulator_value;
+    
+    // Input change detection module
+    change_detector change_det (
+        .clk(clk),
+        .rst(rst),
+        .data_a(Data_A),
+        .data_b(Data_B),
+        .clear_mult(Clear_and_Mult),
+        .input_changed(input_changed)
+    );
+    
+    // Stage 1: Input registers
+    input_registers input_regs (
+        .clk(clk),
+        .rst(rst),
+        .data_a_in(Data_A),
+        .data_b_in(Data_B),
+        .clear_mult_in(Clear_and_Mult),
+        .valid_in(input_changed),
+        .data_a_out(reg_A),
+        .data_b_out(reg_B),
+        .clear_mult_out(reg_Clear_and_Mult),
+        .valid_out(reg_valid)
+    );
+    
+    // Stage 2: Pipeline registers
+    pipeline_registers pipe_regs (
+        .clk(clk),
+        .rst(rst),
+        .data_a_in(reg_A),
+        .data_b_in(reg_B),
+        .clear_mult_in(reg_Clear_and_Mult),
+        .valid_in(reg_valid),
+        .data_a_out(pipe_A),
+        .data_b_out(pipe_B),
+        .clear_mult_out(pipe_Clear_and_Mult),
+        .valid_out(pipe_valid)
+    );
+    
+    // Multiplier module
     TC_Mul #(.BIT_WIDTH(8)) multiplier (
         .in0(pipe_A),
         .in1(pipe_B),
-        .out0(mult_result[7:0]),     // 低8位
-        .out1(mult_result[15:8])     // 高8位
+        .out0(mult_result[7:0]),     // Lower 8 bits
+        .out1(mult_result[15:8])     // Upper 8 bits
     );
     
-    // 加法器 - 累加器 + 当前乘法结果
-    assign add_result = accumulator + {1'b0, mult_result};
-    
-    // 时序逻辑 - 带有效信号控制的流水线
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
-            // 复位所有寄存器
-            reg_A <= 8'b0;
-            reg_B <= 8'b0;
-            reg_Clear_and_Mult <= 1'b0;
-            reg_valid <= 1'b0;
-            pipe_A <= 8'b0;
-            pipe_B <= 8'b0;
-            pipe_Clear_and_Mult <= 1'b0;
-            pipe_valid <= 1'b0;
-            accumulator <= 17'b0;
-            Output_2 <= 16'b0;
-            Output_1 <= 1'b0;
-            last_A <= 8'b0;
-            last_B <= 8'b0;
-            last_Clear_and_Mult <= 1'b0;
-        end else begin
-            // 更新历史值
-            last_A <= Data_A;
-            last_B <= Data_B;
-            last_Clear_and_Mult <= Clear_and_Mult;
-            
-            // 第一级：输入寄存（只有输入变化时才有效）
-            reg_A <= Data_A;
-            reg_B <= Data_B;
-            reg_Clear_and_Mult <= Clear_and_Mult;
-            reg_valid <= input_changed;
-            
-            // 第二级：流水线推进
-            pipe_A <= reg_A;
-            pipe_B <= reg_B;
-            pipe_Clear_and_Mult <= reg_Clear_and_Mult;
-            pipe_valid <= reg_valid;
-            
-            // 第三级：只有当流水线有效时才进行计算
-            if (pipe_valid) begin
-                if (pipe_Clear_and_Mult) begin
-                    // 清零模式：累加器设为当前乘法结果
-                    accumulator <= {1'b0, mult_result};
-                    Output_2 <= mult_result;
-                    Output_1 <= 1'b0;  // 单次乘法不会溢出16位
-                end else begin
-                    // 累加模式：累加器 += 当前乘法结果
-                    accumulator <= add_result;
-                    Output_2 <= add_result[15:0];
-                    Output_1 <= add_result[16];  // 溢出标志
-                end
-            end
-            // 如果pipe_valid为0，则不更新累加器和输出
-        end
-    end
+    // Accumulator module
+    accumulator_17bit accumulator (
+        .clk(clk),
+        .rst(rst),
+        .mult_result(mult_result),
+        .clear_mode(pipe_Clear_and_Mult),
+        .valid(pipe_valid),
+        .accumulator_value(accumulator_value),
+        .result_out(Output_2),
+        .overflow_out(Output_1)
+    );
 
 endmodule 

@@ -79,15 +79,18 @@ async def test_boundary_values(dut):
     print("=== Testing Boundary Values ===")
     
     boundary_cases = [
-        # (A, B, expected, description) - limited by 7-bit Data_B
+        # (A, B, expected, description) - A: 8-bit (0-255), B: 7-bit (0-127)
         (1, 1, 1, "Minimum positive"),
-        (127, 127, 16129, "Maximum 7-bit values"),
+        (255, 127, 32385, "True maximum: 8-bit * 7-bit"),  # 真正的最大值
+        (127, 127, 16129, "7-bit * 7-bit maximum"),
+        (255, 1, 255, "8-bit max * minimum"),
+        (1, 127, 127, "Minimum * 7-bit max"),
         (64, 64, 4096, "Mid-range squared"),
+        (128, 64, 8192, "8-bit mid * 7-bit mid"),
         (2, 2, 4, "Power of 2"),
         (16, 16, 256, "Larger power of 2"),
         (100, 100, 10000, "Large values"),
-        (126, 1, 126, "Near-max * small"),
-        (1, 126, 126, "Small * near-max"),
+        (254, 126, 32004, "Near-max * near-max"),
     ]
     
     for a, b, expected, desc in boundary_cases:
@@ -240,7 +243,7 @@ async def test_mathematical_patterns(dut):
     await reset_dut(dut)
     
     print("=== Testing Mathematical Patterns ===")
-    
+        
     # Prime number tests
     prime_tests = [(2, 3, 6), (5, 7, 35), (11, 13, 143), (17, 19, 323)]
     accumulator = 0
@@ -259,7 +262,7 @@ async def test_mathematical_patterns(dut):
         # Handle overflow for accumulated values
         expected_result = accumulator & 0xFFFF if accumulator > 65535 else accumulator
         print(f"Prime {i+1}: {a}*{b} -> accumulator = {result}")
-    
+        
     # Fibonacci sequence test
     print("--- Fibonacci Test ---")
     fib_numbers = [1, 1, 2, 3, 5, 8]

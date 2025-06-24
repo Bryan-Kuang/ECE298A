@@ -14,6 +14,10 @@ SIM_BUILD				= sim_build/rtl
 # TinyTapeout top module and dependency source files
 VERILOG_SOURCES += ../src/tt_um_ARandomNam_mac_peripheral.v
 VERILOG_SOURCES += ../src/MAC_simple.v
+VERILOG_SOURCES += ../src/components/input_registers.v
+VERILOG_SOURCES += ../src/components/change_detector.v
+VERILOG_SOURCES += ../src/components/pipeline_registers.v
+VERILOG_SOURCES += ../src/components/accumulator_17bit.v
 VERILOG_SOURCES += ../src/builtin_components/TC_Mul.v
 
 else
