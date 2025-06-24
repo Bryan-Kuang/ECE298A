@@ -5,7 +5,7 @@
 SIM ?= icarus
 TOPLEVEL_LANG ?= verilog
 SRC_DIR := /Users/bryan/Library/CloudStorage/OneDrive-UniversityofWaterloo/Waterloo/2B/ECE\ 298A/src
-PROJECT_SOURCES = tt_um_ARandomNam_mac_peripheral.v MAC_simple.v
+PROJECT_SOURCES = tt_um_ARandomNam_mac_peripheral.v MAC_simple.v components/input_registers.v components/change_detector.v components/pipeline_registers.v components/accumulator_17bit.v builtin_components/TC_Mul.v
 
 ifneq ($(GATES),yes)
 
