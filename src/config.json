@@ -1,0 +1,22 @@
+{
+  "DESIGN_NAME": "tt_um_ARandomNam_mac_peripheral",
+  "VERILOG_FILES": [
+    "dir::src/tt_um_ARandomNam_mac_peripheral.v",
+    "dir::src/MAC_simple.v",
+    "dir::src/builtin_components/TC_Mul.v"
+  ],
+  "CLOCK_PORT": "clk",
+  "CLOCK_NET": "clk",
+  "FP_PDN_MULTILAYER": false,
+  "RT_MAX_LAYER": "met4",
+  "CLOCK_PERIOD": 20,
+  "PL_BASIC_PLACEMENT": true,
+  "FP_SIZING": "absolute",
+  "DIE_AREA": "0 0 161.29 111.52",
+  "FP_PDN_CHECK_NODES": false,
+  "FP_PDN_ENABLE_RAILS": false,
+  "QUIT_ON_TIMING_VIOLATIONS": false,
+  "QUIT_ON_MAGIC_DRC": false,
+  "QUIT_ON_LVS_ERROR": false,
+  "QUIT_ON_SLEW_VIOLATIONS": false
+}
