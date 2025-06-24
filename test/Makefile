@@ -5,13 +5,14 @@
 SIM ?= icarus
 TOPLEVEL_LANG ?= verilog
 SRC_DIR := /Users/bryan/Library/CloudStorage/OneDrive-UniversityofWaterloo/Waterloo/2B/ECE\ 298A/src
-PROJECT_SOURCES = MAC_simple.v
+PROJECT_SOURCES = tt_um_ARandomNam_mac_peripheral.v MAC_simple.v
 
 ifneq ($(GATES),yes)
 
 # RTL simulation:
 SIM_BUILD				= sim_build/rtl
-# Simplified MAC module and dependency source files
+# TinyTapeout top module and dependency source files
+VERILOG_SOURCES += ../src/tt_um_ARandomNam_mac_peripheral.v
 VERILOG_SOURCES += ../src/MAC_simple.v
 VERILOG_SOURCES += ../src/builtin_components/TC_Mul.v
 

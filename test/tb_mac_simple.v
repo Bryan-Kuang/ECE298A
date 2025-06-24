@@ -3,35 +3,35 @@
 module tb_mac_simple;
     // Clock and reset signals
     reg clk;
-    reg rst;
+    reg rst_n;
     
-    // MAC input signals
-    reg Clear_and_Mult;
-    reg [7:0] Data_A;
-    reg [7:0] Data_B;
-    
-    // MAC output signals
-    wire Output_1;
-    wire [15:0] Output_2;
+    // TinyTapeout interface signals
+    reg [7:0] ui_in;     // Dedicated inputs - Data_A
+    wire [7:0] uo_out;   // Dedicated outputs - Result[7:0]
+    reg [7:0] uio_in;    // Bidirectional inputs - Data_B[6:0] + Clear_and_Mult
+    wire [7:0] uio_out;  // Bidirectional outputs - Result[15:8] + Overflow
+    wire [7:0] uio_oe;   // Bidirectional enable
+    reg ena;             // Enable signal
 
-    // Instantiate simplified MAC module
-    MAC_simple dut (
+    // Instantiate TinyTapeout top module
+    tt_um_ARandomNam_mac_peripheral dut (
+        .ui_in(ui_in),
+        .uo_out(uo_out),
+        .uio_in(uio_in),
+        .uio_out(uio_out),
+        .uio_oe(uio_oe),
+        .ena(ena),
         .clk(clk),
-        .rst(rst),
-        .Clear_and_Mult(Clear_and_Mult),
-        .Data_A(Data_A),
-        .Data_B(Data_B),
-        .Output_1(Output_1),
-        .Output_2(Output_2)
+        .rst_n(rst_n)
     );
 
     // Initialize signals (but don't run any tests)
     initial begin
         clk = 0;
-        rst = 0;
-        Clear_and_Mult = 0;
-        Data_A = 0;
-        Data_B = 0;
+        rst_n = 1;
+        ena = 1;
+        ui_in = 0;
+        uio_in = 0;
     end
 
     // Generate VCD file for waveform viewing

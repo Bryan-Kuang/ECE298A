@@ -6,6 +6,7 @@ async def reset_dut(dut):
     """Helper function to reset DUT"""
     dut.rst_n.value = 0
     await RisingEdge(dut.clk)
+    await RisingEdge(dut.clk)
     dut.rst_n.value = 1
     await RisingEdge(dut.clk)
 
@@ -14,37 +15,39 @@ async def wait_result(dut, cycles=4):
     for _ in range(cycles):
         await RisingEdge(dut.clk)
 
+# Helper function to set inputs based on test mode
 def set_inputs(dut, data_a, data_b, clear_mult):
-    """Helper function to set TinyTapeout inputs"""
-    dut.ui_in.value = data_a & 0xFF  # Data_A on ui_in
-    dut.uio_in.value = ((clear_mult & 1) << 7) | (data_b & 0x7F)  # Clear_Mult[7] + Data_B[6:0]
+    """Set inputs for both RTL and gate-level tests"""
+    if hasattr(dut, 'ui_in'):  # Gate-level test
+        dut.ui_in.value = data_a
+        dut.uio_in.value = (clear_mult << 7) | (data_b & 0x7F)
+    else:  # RTL test
+        dut.Data_A.value = data_a
+        dut.Data_B.value = data_b
+        dut.Clear_and_Mult.value = clear_mult
 
-def get_result(dut):
-    """Helper function to get 16-bit result from TinyTapeout outputs"""
-    low_byte = int(dut.uo_out.value) & 0xFF
-    high_byte = int(dut.uio_out.value) & 0x7F
-    return (high_byte << 8) | low_byte
-
-def get_overflow(dut):
-    """Helper function to get overflow flag"""
-    return (int(dut.uio_out.value) >> 7) & 1
+def get_outputs(dut):
+    """Get outputs for both RTL and gate-level tests"""
+    if hasattr(dut, 'uo_out'):  # Gate-level test
+        result = int(dut.uo_out.value) | (int(dut.uio_out.value) & 0x7F) << 8
+        overflow = (int(dut.uio_out.value) >> 7) & 1
+        return result, overflow
+    else:  # RTL test
+        return int(dut.Output_2.value), int(dut.Output_1.value)
 
 @cocotb.test()
 async def test_basic_functionality(dut):
     """Test basic MAC functionality including reset, zero, and simple operations"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
-    # Initialize TinyTapeout signals
-    dut.ena.value = 1
-    
     print("=== Testing Basic Functionality ===")
     
     # Test reset functionality
-    set_inputs(dut, 100, 50, 1)
+    set_inputs(dut, 100, 200, 1)
     await wait_result(dut)
     await reset_dut(dut)
     
-    result = get_result(dut)
+    result, _ = get_outputs(dut)
     assert result == 0, f"Reset failed: expected 0, got {result}"
     print("✅ Reset functionality works")
     
@@ -52,17 +55,17 @@ async def test_basic_functionality(dut):
     set_inputs(dut, 0, 0, 1)
     await wait_result(dut)
     
-    result = get_result(dut)
+    result, _ = get_outputs(dut)
     assert result == 0, f"Zero multiplication failed: expected 0, got {result}"
     print("✅ Zero multiplication works")
     
     # Test one operand zero: 255 * 0 = 0, 0 * 255 = 0
-    test_cases = [(127, 0, 0), (0, 127, 0), (42, 1, 42), (1, 123, 123)]
+    test_cases = [(255, 0, 0), (0, 127, 0), (42, 1, 42), (1, 123, 123)]  # Note: B limited to 7 bits in GL
     for a, b, expected in test_cases:
         set_inputs(dut, a, b, 1)
         await wait_result(dut)
         
-        result = get_result(dut)
+        result, _ = get_outputs(dut)
         assert result == expected, f"{a}*{b} failed: expected {expected}, got {result}"
         print(f"Basic test: {a}*{b} = {result}")
     
@@ -73,20 +76,19 @@ async def test_basic_functionality(dut):
 async def test_boundary_values(dut):
     """Test boundary values and extreme cases"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
-    dut.ena.value = 1
     await reset_dut(dut)
     
     print("=== Testing Boundary Values ===")
     
     boundary_cases = [
-        # (A, B, expected, description) - limited by 7-bit Data_B
+        # (A, B, expected, description)
         (1, 1, 1, "Minimum positive"),
-        (127, 127, 16129, "Maximum 7-bit values"),
-        (64, 64, 4096, "Mid-range squared"),
+        (255, 127, 32385, "Maximum values (B limited to 7-bit)"),
+        (128, 64, 8192, "Mid-range squared"),
         (2, 2, 4, "Power of 2"),
         (16, 16, 256, "Larger power of 2"),
-        (100, 100, 10000, "Large values"),
-        (126, 1, 126, "Near-max * small"),
+        (127, 127, 16129, "Near mid-range"),
+        (254, 1, 254, "Near-max * small"),
         (1, 126, 126, "Small * near-max"),
     ]
     
@@ -94,7 +96,7 @@ async def test_boundary_values(dut):
         set_inputs(dut, a, b, 1)
         await wait_result(dut)
         
-        result = get_result(dut)
+        result, _ = get_outputs(dut)
         assert result == expected, f"{desc} failed: {a}*{b} expected {expected}, got {result}"
         print(f"Boundary: {desc} - {a}*{b} = {result}")
     
@@ -105,7 +107,6 @@ async def test_boundary_values(dut):
 async def test_accumulation_modes(dut):
     """Test clear vs accumulate mode switching"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
-    dut.ena.value = 1
     await reset_dut(dut)
     
     print("=== Testing Accumulation Modes ===")
@@ -123,7 +124,7 @@ async def test_accumulation_modes(dut):
         set_inputs(dut, a, b, clear)
         await wait_result(dut)
         
-        result = get_result(dut)
+        result, _ = get_outputs(dut)
         assert result == expected, f"{desc} failed: expected {expected}, got {result}"
         print(f"Mode test: {desc} -> {result}")
     
@@ -134,41 +135,36 @@ async def test_accumulation_modes(dut):
 async def test_overflow_detection(dut):
     """Test overflow detection and handling"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
-    dut.ena.value = 1
     await reset_dut(dut)
     
     print("=== Testing Overflow Detection ===")
     
-    # Start with large value: 255*127 = 32385 (limited by 7-bit Data_B)
-    dut.ena.value = 1
-    set_inputs(dut, 255, 127, 1)  # Clear mode
+    # Start with large value: 255*127 = 32385 (B limited to 7-bit)
+    set_inputs(dut, 255, 127, 1)
     await wait_result(dut)
     
-    result1 = get_result(dut)
-    overflow1 = get_overflow(dut)
-    expected1 = 255 * 127
-    assert result1 == expected1, f"Large multiplication failed: expected {expected1}, got {result1}"
-    print(f"Large value: 255*127 = {result1} (overflow={overflow1})")
+    result1, overflow1 = get_outputs(dut)
+    assert result1 == 32385, f"Large multiplication failed: expected 32385, got {result1}"
+    assert overflow1 == 0, f"Unexpected overflow: expected 0, got {overflow1}"
+    print(f"Large value: 255*127 = {result1} (no overflow)")
     
     # Add another large value to cause overflow: +200*100 = +20000
-    set_inputs(dut, 200, 100, 0)  # Accumulate mode
+    set_inputs(dut, 200, 100, 0)
     await wait_result(dut)
     
-    result2 = get_result(dut)
-    overflow2 = get_overflow(dut)
-    expected_total = expected1 + (200 * 100)  # Should cause overflow
+    result2, overflow2 = get_outputs(dut)
+    expected_total = 32385 + 20000  # 52385, should not overflow
     expected_result = expected_total & 0xFFFF
     
-    print(f"Overflow test: {expected1} + {200*100} = {result2} (overflow={overflow2})")
+    print(f"Overflow test: 32385 + 20000 = {result2} (overflow={overflow2})")
     print(f"Expected: result={expected_result}, overflow={1 if expected_total > 65535 else 0}")
     
     # Multiple consecutive overflows
-    set_inputs(dut, 150, 120, 0)  # Accumulate mode
+    set_inputs(dut, 150, 100, 0)
     await wait_result(dut)
     
-    result3 = get_result(dut)
-    overflow3 = get_overflow(dut)
-    print(f"Multiple overflow: +{150*120} -> result={result3} (overflow={overflow3})")
+    result3, overflow3 = get_outputs(dut)
+    print(f"Multiple overflow: +{150*100} -> result={result3} (overflow={overflow3})")
     
     print("✅ Overflow detection test passed")
     await reset_dut(dut)
@@ -177,24 +173,26 @@ async def test_overflow_detection(dut):
 async def test_pipeline_timing(dut):
     """Test pipeline timing and back-to-back operations"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
-    dut.ena.value = 1
     await reset_dut(dut)
     
     print("=== Testing Pipeline Timing ===")
     
     # Test back-to-back operations
-    dut.ena.value = 1
-    set_inputs(dut, 6, 7, 1)  # Clear mode
+    dut.Data_A.value = 6
+    dut.Data_B.value = 7
+    dut.Clear_and_Mult.value = 1
     await wait_result(dut, 4)
     
-    result1 = get_result(dut)
+    result1 = int(dut.Output_2.value)
     assert result1 == 42, f"First pipeline result failed: expected 42, got {result1}"
     
     # Immediate next operation
-    set_inputs(dut, 3, 4, 0)  # Accumulate mode
+    dut.Data_A.value = 3
+    dut.Data_B.value = 4
+    dut.Clear_and_Mult.value = 0
     await wait_result(dut, 4)
     
-    result2 = get_result(dut)
+    result2 = int(dut.Output_2.value)
     expected2 = 54  # 42 + 12
     assert result2 == expected2, f"Second pipeline result failed: expected {expected2}, got {result2}"
     
@@ -206,7 +204,6 @@ async def test_pipeline_timing(dut):
 async def test_rapid_mode_switching(dut):
     """Test rapid switching between clear and accumulate modes"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
-    dut.ena.value = 1
     await reset_dut(dut)
     
     print("=== Testing Rapid Mode Switching ===")
@@ -221,10 +218,12 @@ async def test_rapid_mode_switching(dut):
     ]
     
     for i, (a, b, clear, expected) in enumerate(rapid_operations):
-        set_inputs(dut, a, b, clear)
+        dut.Data_A.value = a
+        dut.Data_B.value = b
+        dut.Clear_and_Mult.value = clear
         await wait_result(dut)
         
-        result = get_result(dut)
+        result = int(dut.Output_2.value)
         mode = "Clear" if clear else "Accumulate"
         assert result == expected, f"Operation {i+1} ({mode}) failed: expected {expected}, got {result}"
         print(f"Rapid {i+1}: {mode} {a}*{b} -> {result}")
@@ -236,7 +235,6 @@ async def test_rapid_mode_switching(dut):
 async def test_mathematical_patterns(dut):
     """Test mathematical patterns: primes, fibonacci, bit patterns"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
-    dut.ena.value = 1
     await reset_dut(dut)
     
     print("=== Testing Mathematical Patterns ===")
@@ -247,15 +245,17 @@ async def test_mathematical_patterns(dut):
     
     for i, (a, b, expected_mult) in enumerate(prime_tests):
         if i == 0:
-            set_inputs(dut, a, b, 1)  # Clear mode
+            dut.Clear_and_Mult.value = 1
             accumulator = expected_mult
         else:
-            set_inputs(dut, a, b, 0)  # Accumulate mode
+            dut.Clear_and_Mult.value = 0
             accumulator += expected_mult
         
+        dut.Data_A.value = a
+        dut.Data_B.value = b
         await wait_result(dut)
         
-        result = get_result(dut)
+        result = int(dut.Output_2.value)
         # Handle overflow for accumulated values
         expected_result = accumulator & 0xFFFF if accumulator > 65535 else accumulator
         print(f"Prime {i+1}: {a}*{b} -> accumulator = {result}")
@@ -263,17 +263,21 @@ async def test_mathematical_patterns(dut):
     # Fibonacci sequence test
     print("--- Fibonacci Test ---")
     fib_numbers = [1, 1, 2, 3, 5, 8]
-    set_inputs(dut, fib_numbers[0], fib_numbers[1], 1)  # Clear mode
+    dut.Data_A.value = fib_numbers[0]
+    dut.Data_B.value = fib_numbers[1]
+    dut.Clear_and_Mult.value = 1
     await wait_result(dut)
     
     fib_acc = 1
     for i in range(2, len(fib_numbers), 2):
         if i+1 < len(fib_numbers):
-            set_inputs(dut, fib_numbers[i], fib_numbers[i+1], 0)  # Accumulate mode
+            dut.Data_A.value = fib_numbers[i]
+            dut.Data_B.value = fib_numbers[i+1]
+            dut.Clear_and_Mult.value = 0
             await wait_result(dut)
             
             fib_acc += fib_numbers[i] * fib_numbers[i+1]
-            result = get_result(dut)
+            result = int(dut.Output_2.value)
             print(f"Fibonacci: {fib_numbers[i]}*{fib_numbers[i+1]} -> accumulator = {result}")
     
     # Bit pattern test
@@ -285,10 +289,12 @@ async def test_mathematical_patterns(dut):
     ]
     
     for a, b, desc in patterns:
-        set_inputs(dut, a, b, 1)  # Clear mode
+        dut.Data_A.value = a
+        dut.Data_B.value = b
+        dut.Clear_and_Mult.value = 1
         await wait_result(dut)
         
-        result = get_result(dut)
+        result = int(dut.Output_2.value)
         expected = a * b
         assert result == expected, f"{desc} pattern failed: expected {expected}, got {result}"
         print(f"Pattern {desc}: {a:08b}*{b:08b} = {result}")
@@ -300,17 +306,18 @@ async def test_mathematical_patterns(dut):
 async def test_stress_operations(dut):
     """Test stress conditions with many consecutive operations"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
-    dut.ena.value = 1
     await reset_dut(dut)
     
     print("=== Testing Stress Operations ===")
     
     # Start with clear operation
-    set_inputs(dut, 1, 1, 1)  # Clear mode
+    dut.Data_A.value = 1
+    dut.Data_B.value = 1
+    dut.Clear_and_Mult.value = 1
     await wait_result(dut)
     
     accumulator = 1
-    result = get_result(dut)
+    result = int(dut.Output_2.value)
     assert result == accumulator, f"Stress start failed: expected {accumulator}, got {result}"
     
     # Perform 8 accumulation operations
@@ -318,12 +325,14 @@ async def test_stress_operations(dut):
         a = (i + 1) % 8 + 1  # Values 1-8
         b = (i + 3) % 6 + 1  # Values 1-6
         
-        set_inputs(dut, a, b, 0)  # Accumulate mode
+        dut.Data_A.value = a
+        dut.Data_B.value = b
+        dut.Clear_and_Mult.value = 0
         await wait_result(dut)
         
         accumulator = (accumulator + a * b) & 0xFFFF
-        result = get_result(dut)
-        overflow = get_overflow(dut)
+        result = int(dut.Output_2.value)
+        overflow = int(dut.Output_1.value)
         
         print(f"Stress {i+1}: +{a}*{b} -> accumulator = {result} (overflow={overflow})")
     
@@ -334,33 +343,36 @@ async def test_stress_operations(dut):
 async def test_input_stability(dut):
     """Test input stability and edge cases"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
-    dut.ena.value = 1
     await reset_dut(dut)
     
     print("=== Testing Input Stability ===")
     
     # Test stable inputs
-    set_inputs(dut, 40, 20, 1)  # Clear mode
+    dut.Data_A.value = 40
+    dut.Data_B.value = 20
+    dut.Clear_and_Mult.value = 1
     await wait_result(dut)
     
-    result = get_result(dut)
+    result = int(dut.Output_2.value)
     expected = 800
     assert result == expected, f"Input stability failed: expected {expected}, got {result}"
     print(f"Stable inputs: 40*20 = {result}")
     
-    # Test edge values (limited by 7-bit Data_B)
+    # Test edge values
     edge_cases = [
-        (128, 127, 16256, "Mid-range"),
-        (64, 127, 8128, "Power-of-2 * max"),
+        (128, 128, 16384, "Mid-range"),
+        (64, 255, 16320, "Power-of-2 * max"),
         (255, 64, 16320, "Max * power-of-2"),
         (85, 85, 7225, "Special value"),
     ]
     
     for a, b, expected, desc in edge_cases:
-        set_inputs(dut, a, b, 1)  # Clear mode
+        dut.Data_A.value = a
+        dut.Data_B.value = b
+        dut.Clear_and_Mult.value = 1
         await wait_result(dut)
         
-        result = get_result(dut)
+        result = int(dut.Output_2.value)
         assert result == expected, f"{desc} failed: expected {expected}, got {result}"
         print(f"Edge case {desc}: {a}*{b} = {result}")
     
@@ -371,44 +383,49 @@ async def test_input_stability(dut):
 async def test_comprehensive_scenarios(dut):
     """Test comprehensive real-world scenarios"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
-    dut.ena.value = 1
     await reset_dut(dut)
     
     print("=== Testing Comprehensive Scenarios ===")
     
     # Scenario 1: Digital signal processing simulation
     print("--- DSP Simulation ---")
-    signal_samples = [(100, 100), (50, 127), (200, 75), (25, 127)]
+    signal_samples = [(100, 100), (50, 150), (200, 75), (25, 200)]
     
     # Clear with first sample
     a, b = signal_samples[0]
-    set_inputs(dut, a, b, 1)  # Clear mode
+    dut.Data_A.value = a
+    dut.Data_B.value = b
+    dut.Clear_and_Mult.value = 1
     await wait_result(dut)
     
     dsp_acc = a * b
-    result = get_result(dut)
+    result = int(dut.Output_2.value)
     print(f"DSP init: {a}*{b} = {result}")
     
     # Accumulate remaining samples
     for i, (a, b) in enumerate(signal_samples[1:], 1):
-        set_inputs(dut, a, b, 0)  # Accumulate mode
+        dut.Data_A.value = a
+        dut.Data_B.value = b
+        dut.Clear_and_Mult.value = 0
         await wait_result(dut)
         
         dsp_acc = (dsp_acc + a * b) & 0xFFFF
-        result = get_result(dut)
-        overflow = get_overflow(dut)
+        result = int(dut.Output_2.value)
+        overflow = int(dut.Output_1.value)
         print(f"DSP step {i}: +{a}*{b} -> {result} (overflow={overflow})")
     
     # Scenario 2: Coefficient processing
     print("--- Coefficient Processing ---")
-    coefficients = [(15, 15), (240, 120), (128, 64)]
+    coefficients = [(15, 15), (240, 240), (128, 64)]
     
     for i, (a, b) in enumerate(coefficients):
-        set_inputs(dut, a, b, 1)  # Clear mode
+        dut.Data_A.value = a
+        dut.Data_B.value = b
+        dut.Clear_and_Mult.value = 1  # Each coefficient processed independently
         await wait_result(dut)
         
-        result = get_result(dut)
-        overflow = get_overflow(dut)
+        result = int(dut.Output_2.value)
+        overflow = int(dut.Output_1.value)
         expected = a * b
         
         print(f"Coeff {i+1}: {a}*{b} = {result} (expected={expected}, overflow={overflow})")
@@ -425,7 +442,6 @@ async def test_comprehensive_scenarios(dut):
 async def test_final_integration(dut):
     """Final integration test combining all major features"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
-    dut.ena.value = 1
     await reset_dut(dut)
     
     print("=== Final Integration Test ===")
@@ -435,19 +451,21 @@ async def test_final_integration(dut):
         (50, 50, 1, "Large clear operation"),           # 2500
         (10, 10, 0, "Small accumulate"),                # +100 = 2600
         (0, 100, 0, "Zero accumulate"),                 # +0 = 2600
-        (200, 127, 1, "Large clear with potential overflow"), # 25400
-        (100, 100, 0, "Large accumulate causing overflow"),   # +10000 = 35400
+        (200, 200, 1, "Large clear with potential overflow"), # 40000
+        (100, 100, 0, "Large accumulate causing overflow"),   # +10000 = 50000
         (1, 1, 1, "Reset to minimal"),                 # 1
-        (255, 127, 1, "Maximum clear"),                # 32385
-        (5, 5, 0, "Final small accumulate"),           # +25 = 32410
+        (255, 255, 1, "Maximum clear"),                # 65025
+        (5, 5, 0, "Final small accumulate"),           # +25 = 65050 (overflow)
     ]
     
     for i, (a, b, clear, desc) in enumerate(integration_sequence):
-        set_inputs(dut, a, b, clear)
+        dut.Data_A.value = a
+        dut.Data_B.value = b
+        dut.Clear_and_Mult.value = clear
         await wait_result(dut)
         
-        result = get_result(dut)
-        overflow = get_overflow(dut)
+        result = int(dut.Output_2.value)
+        overflow = int(dut.Output_1.value)
         mode = "Clear" if clear else "Accumulate"
         
         print(f"Integration {i+1}: {desc}")
