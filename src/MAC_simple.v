@@ -8,26 +8,18 @@ module MAC_simple (
     output wire Output_1          // Overflow flag
 );
 
-    // Internal interconnect signals
+    // Internal signals
     wire input_changed;
-    
-    // First stage pipeline signals
     wire [7:0] reg_A, reg_B;
     wire reg_Clear_and_Mult;
     wire reg_valid;
-    
-    // Second stage pipeline signals
     wire [7:0] pipe_A, pipe_B;
     wire pipe_Clear_and_Mult;
     wire pipe_valid;
-    
-    // Multiplier output
     wire [15:0] mult_result;
-    
-    // Accumulator signals
     wire [16:0] accumulator_value;
     
-    // Input change detection module
+    // Input change detection
     change_detector change_det (
         .clk(clk),
         .rst(rst),
@@ -65,15 +57,15 @@ module MAC_simple (
         .valid_out(pipe_valid)
     );
     
-    // Multiplier module
+    // 8x8 Multiplier
     TC_Mul #(.BIT_WIDTH(8)) multiplier (
         .in0(pipe_A),
         .in1(pipe_B),
-        .out0(mult_result[7:0]),     // Lower 8 bits
-        .out1(mult_result[15:8])     // Upper 8 bits
+        .out0(mult_result[7:0]),
+        .out1(mult_result[15:8])
     );
     
-    // Accumulator module
+    // 17-bit accumulator
     accumulator_17bit accumulator (
         .clk(clk),
         .rst(rst),

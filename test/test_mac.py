@@ -3,38 +3,31 @@ from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
 async def reset_dut(dut):
-    """Helper function to reset DUT"""
     dut.rst_n.value = 0
     await RisingEdge(dut.clk)
     dut.rst_n.value = 1
     await RisingEdge(dut.clk)
 
 async def wait_result(dut, cycles=4):
-    """Helper function to wait for MAC result"""
     for _ in range(cycles):
         await RisingEdge(dut.clk)
 
 def set_inputs(dut, data_a, data_b, clear_mult):
-    """Helper function to set TinyTapeout inputs"""
-    dut.ui_in.value = data_a & 0xFF  # Data_A on ui_in
-    dut.uio_in.value = ((clear_mult & 1) << 7) | (data_b & 0x7F)  # Clear_Mult[7] + Data_B[6:0]
+    dut.ui_in.value = data_a & 0xFF
+    dut.uio_in.value = ((clear_mult & 1) << 7) | (data_b & 0x7F)
 
 def get_result(dut):
-    """Helper function to get 16-bit result from TinyTapeout outputs"""
     low_byte = int(dut.uo_out.value) & 0xFF
     high_byte = int(dut.uio_out.value) & 0x7F
     return (high_byte << 8) | low_byte
 
 def get_overflow(dut):
-    """Helper function to get overflow flag"""
     return (int(dut.uio_out.value) >> 7) & 1
 
 @cocotb.test()
 async def test_basic_functionality(dut):
-    """Test basic MAC functionality including reset, zero, and simple operations"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
-    # Initialize TinyTapeout signals
     dut.ena.value = 1
     
     print("=== Testing Basic Functionality ===")
@@ -56,7 +49,6 @@ async def test_basic_functionality(dut):
     assert result == 0, f"Zero multiplication failed: expected 0, got {result}"
     print("✅ Zero multiplication works")
     
-    # Test one operand zero: 255 * 0 = 0, 0 * 255 = 0
     test_cases = [(127, 0, 0), (0, 127, 0), (42, 1, 42), (1, 123, 123)]
     for a, b, expected in test_cases:
         set_inputs(dut, a, b, 1)
@@ -71,7 +63,6 @@ async def test_basic_functionality(dut):
 
 @cocotb.test()
 async def test_boundary_values(dut):
-    """Test boundary values and extreme cases"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     dut.ena.value = 1
     await reset_dut(dut)
@@ -79,9 +70,8 @@ async def test_boundary_values(dut):
     print("=== Testing Boundary Values ===")
     
     boundary_cases = [
-        # (A, B, expected, description) - A: 8-bit (0-255), B: 7-bit (0-127)
         (1, 1, 1, "Minimum positive"),
-        (255, 127, 32385, "True maximum: 8-bit * 7-bit"),  # 真正的最大值
+        (255, 127, 32385, "True maximum: 8-bit * 7-bit"),
         (127, 127, 16129, "7-bit * 7-bit maximum"),
         (255, 1, 255, "8-bit max * minimum"),
         (1, 127, 127, "Minimum * 7-bit max"),
@@ -106,20 +96,18 @@ async def test_boundary_values(dut):
 
 @cocotb.test()
 async def test_accumulation_modes(dut):
-    """Test clear vs accumulate mode switching"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     dut.ena.value = 1
     await reset_dut(dut)
     
     print("=== Testing Accumulation Modes ===")
     
-    # Sequential accumulation test
     operations = [
-        (10, 10, 1, 100, "Clear: 10*10"),      # Clear to 100
-        (5, 5, 0, 125, "Accumulate: +5*5"),    # Add 25 -> 125
-        (3, 7, 0, 146, "Accumulate: +3*7"),    # Add 21 -> 146
-        (6, 7, 1, 42, "Clear: 6*7"),          # Clear to 42
-        (2, 3, 0, 48, "Accumulate: +2*3"),     # Add 6 -> 48
+        (10, 10, 1, 100, "Clear: 10*10"),
+        (5, 5, 0, 125, "Accumulate: +5*5"),
+        (3, 7, 0, 146, "Accumulate: +3*7"),
+        (6, 7, 1, 42, "Clear: 6*7"),
+        (2, 3, 0, 48, "Accumulate: +2*3"),
     ]
     
     for a, b, clear, expected, desc in operations:

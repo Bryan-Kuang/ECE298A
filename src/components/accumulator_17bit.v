@@ -20,18 +20,15 @@ module accumulator_17bit (
             overflow_out <= 1'b0;
         end else if (valid) begin
             if (clear_mode) begin
-                // Clear mode: set accumulator to current multiplication result
                 accumulator_value <= {1'b0, mult_result};
                 result_out <= mult_result;
-                overflow_out <= 1'b0;  // Single multiplication won't overflow 16 bits
+                overflow_out <= 1'b0;
             end else begin
-                // Accumulate mode: accumulator += current multiplication result
                 accumulator_value <= add_result;
                 result_out <= add_result[15:0];
-                overflow_out <= add_result[16];  // Overflow flag
+                overflow_out <= add_result[16];
             end
         end
-        // If valid is 0, keep current values unchanged
     end
 
 endmodule 

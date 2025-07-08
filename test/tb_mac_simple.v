@@ -13,7 +13,7 @@ module tb_mac_simple;
     wire [7:0] uio_oe;   // Bidirectional enable
     reg ena;             // Enable signal
 
-    // Instantiate TinyTapeout top module
+    // TinyTapeout top module
     tt_um_ARandomNam_mac_peripheral dut (
         .ui_in(ui_in),
         .uo_out(uo_out),
@@ -34,7 +34,7 @@ module tb_mac_simple;
         uio_in = 0;
     end
 
-    // Generate VCD file for waveform viewing
+    // Generate VCD for waveform viewing
     initial begin
         $dumpfile("mac_simple_test.vcd");
         $dumpvars(0, tb_mac_simple);
