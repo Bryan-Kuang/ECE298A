@@ -5,20 +5,15 @@
 SIM ?= icarus
 TOPLEVEL_LANG ?= verilog
 SRC_DIR := /Users/bryan/Library/CloudStorage/OneDrive-UniversityofWaterloo/Waterloo/2B/ECE\ 298A/src
-PROJECT_SOURCES = tt_um_ARandomNam_mac_peripheral.v MAC_simple.v components/input_registers.v components/change_detector.v components/pipeline_registers.v components/accumulator_17bit.v builtin_components/TC_Mul.v
+PROJECT_SOURCES = tt_um_BryanKuang_mac_peripheral.v MAC_simple.v nibble_interface.v components/input_registers.v components/change_detector.v components/pipeline_registers.v components/accumulator_17bit.v builtin_components/TC_Mul.v
+
+# Common Verilog sources (without testbench)
+COMMON_VERILOG_SOURCES = ../src/tt_um_BryanKuang_mac_peripheral.v ../src/MAC_simple.v ../src/nibble_interface.v ../src/components/input_registers.v ../src/components/change_detector.v ../src/components/pipeline_registers.v ../src/components/accumulator_17bit.v ../src/builtin_components/TC_Mul.v
 
 ifneq ($(GATES),yes)
 
 # RTL simulation:
 SIM_BUILD				= sim_build/rtl
-# TinyTapeout top module and dependency source files
-VERILOG_SOURCES += ../src/tt_um_ARandomNam_mac_peripheral.v
-VERILOG_SOURCES += ../src/MAC_simple.v
-VERILOG_SOURCES += ../src/components/input_registers.v
-VERILOG_SOURCES += ../src/components/change_detector.v
-VERILOG_SOURCES += ../src/components/pipeline_registers.v
-VERILOG_SOURCES += ../src/components/accumulator_17bit.v
-VERILOG_SOURCES += ../src/builtin_components/TC_Mul.v
 
 else
 
@@ -38,11 +33,20 @@ endif
 # Allow sharing configuration between design and testbench via `include`:
 COMPILE_ARGS 		+= -I../src
 
-# Include the testbench sources:
-VERILOG_SOURCES += tb_mac_simple.v
-TOPLEVEL = tb_mac_simple
+# Default test: original MAC tests
+test_mac:
+	$(MAKE) VERILOG_SOURCES="$(COMMON_VERILOG_SOURCES) tb_mac_simple.v" TOPLEVEL=tb_mac_simple MODULE=test_mac sim
 
-# MODULE is the basename of the Python test file
+# Nibble interface test
+test_nibble:
+	$(MAKE) VERILOG_SOURCES="$(COMMON_VERILOG_SOURCES) tb_mac_nibble.v" TOPLEVEL=tb_mac_nibble MODULE=test_mac_nibble sim
+
+# Default target
+all: test_mac test_nibble
+
+# Backward compatibility - default to MAC test
+VERILOG_SOURCES = $(COMMON_VERILOG_SOURCES) tb_mac_simple.v
+TOPLEVEL = tb_mac_simple
 MODULE = test_mac
 
 # include cocotb's make rules to take care of the simulator setup

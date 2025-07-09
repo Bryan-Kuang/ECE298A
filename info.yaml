@@ -1,62 +1,60 @@
 # Tiny Tapeout project information
 project:
-  title: "8x8 MAC Peripheral" # Project title
+  title: "8-bit Multiply-Accumulate (MAC) with Nibble Serial Interface" # Project title
   author: "Bryan Kuang" # Your name
   discord: "bk233" # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
-  description: "8×8→16-bit MAC with accumulator and overflow detection" # One line description of what your project does
+  description: "An 8×8→16-bit multiply-accumulate unit with 4-bit nibble serial input/output interface, featuring overflow detection and 17-bit internal accumulation" # One line description of what your project does
   language: "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
-  clock_hz: 50000000 # Clock frequency in Hz (50MHz)
+  clock: "10 MHz" # Clock frequency
 
-  # How many tiles your design occupies? A single tile is about 167x108 uM.
-  tiles: "1x1" # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 6x2 or 8x2
+# How many tiles your design occupies? A single tile is about 160 x 100 um.
+tiles: "1x1" # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 6x2 or 8x2
 
-  # Your top module name must start with "tt_um_". Make it unique by including your github username:
-  top_module: "tt_um_ARandomNam_mac_peripheral"
+# Your top module name must start with "tt_um_". Make it unique by including your github username:
+top_module: "tt_um_BryanKuang_mac_peripheral"
 
-  # List your project's source files here.
-  # Source files must be in ./src and you must list each source file separately, one per line.
-  # Don't forget to also update `PROJECT_SOURCES` in test/Makefile.
-  source_files:
-    - "tt_um_ARandomNam_mac_peripheral.v"
-    - "MAC_simple.v"
-    - "builtin_components/TC_Mul.v"
-    - "components/input_registers.v"
-    - "components/change_detector.v"
-    - "components/pipeline_registers.v"
-    - "components/accumulator_17bit.v"
+# List your project's source files here.
+source_files:
+  - tt_um_BryanKuang_mac_peripheral.v
+  - MAC_simple.v
+  - nibble_interface.v
+  - components/input_registers.v
+  - components/change_detector.v
+  - components/pipeline_registers.v
+  - components/accumulator_17bit.v
+  - builtin_components/TC_Mul.v
 
-# The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
-# This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
+# The pinout of your project. Leave unused pins blank. Many GPIO pins can be used as analog pins.
 pinout:
   # Inputs
-  ui[0]: "Data_A[0]"
-  ui[1]: "Data_A[1]"
-  ui[2]: "Data_A[2]"
-  ui[3]: "Data_A[3]"
-  ui[4]: "Data_A[4]"
-  ui[5]: "Data_A[5]"
-  ui[6]: "Data_A[6]"
-  ui[7]: "Data_A[7]"
+  ui[0]: "Data_A[3:0] - Lower nibble of 8-bit input A"
+  ui[1]: "Data_A[3:0] - Lower nibble of 8-bit input A"
+  ui[2]: "Data_A[3:0] - Lower nibble of 8-bit input A"
+  ui[3]: "Data_A[3:0] - Lower nibble of 8-bit input A"
+  ui[4]: "Data_B[3:0] - Lower nibble of 8-bit input B"
+  ui[5]: "Data_B[3:0] - Lower nibble of 8-bit input B"
+  ui[6]: "Data_B[3:0] - Lower nibble of 8-bit input B"
+  ui[7]: "Data_B[3:0] - Lower nibble of 8-bit input B"
 
   # Outputs
-  uo[0]: "Result[0]"
-  uo[1]: "Result[1]"
-  uo[2]: "Result[2]"
-  uo[3]: "Result[3]"
-  uo[4]: "Result[4]"
-  uo[5]: "Result[5]"
-  uo[6]: "Result[6]"
-  uo[7]: "Result[7]"
+  uo[0]: "Result_Low[3:0] - Lower nibble of result low byte"
+  uo[1]: "Result_Low[3:0] - Lower nibble of result low byte"
+  uo[2]: "Result_Low[3:0] - Lower nibble of result low byte"
+  uo[3]: "Result_Low[3:0] - Lower nibble of result low byte"
+  uo[4]: "Result_High[3:0] - Lower nibble of result high byte"
+  uo[5]: "Result_High[3:0] - Lower nibble of result high byte"
+  uo[6]: "Result_High[3:0] - Lower nibble of result high byte"
+  uo[7]: "Result_High[3:0] - Lower nibble of result high byte"
 
-  # Bidirectional pins (input when design runs, output when showing results)
-  uio[0]: "Data_B[0] / Result[8]"
-  uio[1]: "Data_B[1] / Result[9]"
-  uio[2]: "Data_B[2] / Result[10]"
-  uio[3]: "Data_B[3] / Result[11]"
-  uio[4]: "Data_B[4] / Result[12]"
-  uio[5]: "Data_B[5] / Result[13]"
-  uio[6]: "Data_B[6] / Result[14]"
-  uio[7]: "Clear_Mult / Overflow"
+  # Bidirectional pins
+  uio[0]: "Clear_and_Mult - Control signal (0=accumulate, 1=clear)"
+  uio[1]: "Enable - Nibble interface enable signal"
+  uio[2]: "Overflow - Overflow flag output"
+  uio[3]: "Data_Ready - Ready for new data flag output"
+  uio[4]: ""
+  uio[5]: ""
+  uio[6]: ""
+  uio[7]: ""
 
 # Do not change!
 yaml_version: 6
