@@ -3,12 +3,12 @@ module nibble_interface (
     input wire rst,
     input wire enable,
     
-    // 4-bit nibble inputs
+    // 4-bit nibble inputs - 2 independent input ports
     input wire [3:0] data_a_nibble_in,
     input wire [3:0] data_b_nibble_in,
     input wire clear_and_mult_in,
     
-    // 4-bit nibble outputs
+    // 4-bit nibble outputs - 2 independent output ports  
     output wire [3:0] result_low_nibble_out,
     output wire [3:0] result_high_nibble_out,
     output wire overflow_out,
@@ -30,13 +30,17 @@ module nibble_interface (
     reg assembled_clear_mult;
     reg data_valid;
     
-    // Output registers for result nibbles
-    reg [7:0] result_low_reg, result_high_reg;
+    // Output state for independent result cycling
+    reg output_cycle_state;  // 0 = output lower nibbles, 1 = output upper nibbles
+    
+    // Output registers for result - separate 8-bit registers for low and high bytes
+    reg [7:0] result_low_byte, result_high_byte;
     reg overflow_reg;
     
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             cycle_state <= 1'b0;
+            output_cycle_state <= 1'b0;
             data_a_lower <= 4'b0;
             data_b_lower <= 4'b0;
             clear_mult_stored <= 1'b0;
@@ -44,15 +48,20 @@ module nibble_interface (
             assembled_data_b <= 8'b0;
             assembled_clear_mult <= 1'b0;
             data_valid <= 1'b0;
-            result_low_reg <= 8'b0;
-            result_high_reg <= 8'b0;
+            result_low_byte <= 8'b0;
+            result_high_byte <= 8'b0;
             overflow_reg <= 1'b0;
         end else begin
-            // Always capture MAC results first
+            // Always capture MAC results and advance output cycle
             if (mac_result != 16'b0 || mac_overflow) begin
-                result_low_reg <= mac_result[7:0];
-                result_high_reg <= mac_result[15:8];
+                result_low_byte <= mac_result[7:0];
+                result_high_byte <= mac_result[15:8];
                 overflow_reg <= mac_overflow;
+                // Advance output cycle state when new result arrives
+                output_cycle_state <= ~output_cycle_state;
+            end else begin
+                // Auto-advance output cycle every few clocks to show all nibbles
+                output_cycle_state <= ~output_cycle_state;
             end
             
             if (enable) begin
@@ -82,10 +91,10 @@ module nibble_interface (
     assign mac_data_b = assembled_data_b;
     assign mac_clear_and_mult = assembled_clear_mult && data_valid;
     
-    // Output nibble selection based on cycle
-    assign result_low_nibble_out = cycle_state ? result_low_reg[7:4] : result_low_reg[3:0];
-    assign result_high_nibble_out = cycle_state ? result_high_reg[7:4] : result_high_reg[3:0];
+    // Independent 4-bit output ports - cycle through nibbles to show complete 16-bit result
+    assign result_low_nibble_out = output_cycle_state ? result_low_byte[7:4] : result_low_byte[3:0];     // Low byte nibbles
+    assign result_high_nibble_out = output_cycle_state ? result_high_byte[7:4] : result_high_byte[3:0];   // High byte nibbles
     assign overflow_out = overflow_reg;
-    assign data_ready = (cycle_state == 1'b0) && !enable;  // Ready for new data after second cycle
+    assign data_ready = (cycle_state == 1'b0) && !enable;    // Ready for new data after second cycle
 
 endmodule 

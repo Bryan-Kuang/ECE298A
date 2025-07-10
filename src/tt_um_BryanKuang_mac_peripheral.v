@@ -16,15 +16,15 @@ module tt_um_BryanKuang_mac_peripheral (
     input  wire       rst_n     // reset_n - low to reset
 );
 
-  // Nibble interface pin mapping
-  wire [3:0] data_a_nibble = ui_in[3:0];             // Data_A nibble input
-  wire [3:0] data_b_nibble = ui_in[7:4];             // Data_B nibble input
+  // Nibble interface pin mapping - 4 independent 4-bit serial ports
+  wire [3:0] data_a_nibble = ui_in[3:0];             // Data_A 4-bit input port
+  wire [3:0] data_b_nibble = ui_in[7:4];             // Data_B 4-bit input port
   wire clear_and_mult = uio_in[0];                   // Clear and multiply control
   wire enable_nibble = uio_in[1];                    // Enable nibble interface
   
-  // Nibble interface outputs
-  wire [3:0] result_low_nibble;
-  wire [3:0] result_high_nibble;
+  // Nibble interface outputs - 4 independent 4-bit serial ports
+  wire [3:0] result_low_nibble;                      // Result low 4-bit output port
+  wire [3:0] result_high_nibble;                     // Result high 4-bit output port
   wire overflow_nibble;
   wire data_ready;
   
@@ -122,12 +122,12 @@ module tt_um_BryanKuang_mac_peripheral (
     .overflow_out(mac_overflow)
   );
   
-  // Output mapping
-  assign uo_out[3:0] = result_low_nibble;            // Result low nibble
-  assign uo_out[7:4] = result_high_nibble;           // Result high nibble
+  // Output mapping - 4 independent 4-bit serial ports
+  assign uo_out[3:0] = result_low_nibble;            // Result low 4-bit port
+  assign uo_out[7:4] = result_high_nibble;           // Result high 4-bit port
   assign uio_oe[7:0] = 8'b11111100;                  // uio[7:2] as outputs, uio[1:0] as inputs
-  assign uio_out[0] = overflow_nibble;               // Overflow flag
-  assign uio_out[1] = data_ready;                    // Data ready flag
+  assign uio_out[0] = overflow_nibble;               // Overflow flag output
+  assign uio_out[1] = data_ready;                    // Data ready flag output
   assign uio_out[7:2] = 6'b0;                        // Unused outputs
 
   // Suppress unused signal warnings

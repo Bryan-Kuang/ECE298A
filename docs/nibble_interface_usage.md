@@ -1,45 +1,53 @@
-# Nibble Interface Usage Guide
+# 4-bit Serial Interface Usage Guide
 
 ## Overview
 
-The 8-bit MAC peripheral now features a nibble-based serial interface that allows 8-bit data transmission using only 4-bit pins over 2 clock cycles. This design frees up I/O pins for additional functionality while maintaining full MAC capabilities.
+The 8-bit MAC peripheral features a **4-bit serial interface** using **4 independent single-direction 4-bit ports** that allows complete 8-bit data transmission and 16-bit result readback using a 2-cycle protocol. This design efficiently uses TinyTapeout's limited I/O pins while maintaining full MAC capabilities.
 
-## Interface Protocol
+## Interface Design
 
-### Pin Assignment
+### Port Assignment
 
-| Pin Group     | Function           | Description                            |
-| ------------- | ------------------ | -------------------------------------- |
-| `ui_in[3:0]`  | Data_A Nibble      | 4-bit nibble for input A               |
-| `ui_in[7:4]`  | Data_B Nibble      | 4-bit nibble for input B               |
-| `uio_in[0]`   | Clear_and_Mult     | Control signal (0=accumulate, 1=clear) |
-| `uio_in[1]`   | Enable             | Nibble interface enable                |
-| `uo_out[3:0]` | Result_Low Nibble  | Lower nibble of result low byte        |
-| `uo_out[7:4]` | Result_High Nibble | Lower nibble of result high byte       |
-| `uio_out[0]`  | Overflow           | Overflow flag output                   |
-| `uio_out[1]`  | Data_Ready         | Ready for new data flag                |
+| Port Group    | Direction | Function                     | Description                            |
+| ------------- | --------- | ---------------------------- | -------------------------------------- |
+| `ui_in[3:0]`  | Input     | Data_A Nibble Port           | 4-bit input port for Data_A            |
+| `ui_in[7:4]`  | Input     | Data_B Nibble Port           | 4-bit input port for Data_B            |
+| `uo_out[3:0]` | Output    | Result Low Byte Nibble Port  | 4-bit output port for result[7:0]      |
+| `uo_out[7:4]` | Output    | Result High Byte Nibble Port | 4-bit output port for result[15:8]     |
+| `uio_in[0]`   | Input     | Clear_and_Mult               | Control signal (0=accumulate, 1=clear) |
+| `uio_in[1]`   | Input     | Enable                       | Interface enable signal                |
+| `uio_out[0]`  | Output    | Overflow                     | Overflow flag output                   |
+| `uio_out[1]`  | Output    | Data_Ready                   | Ready for new data flag                |
 
 ### Data Transmission Protocol
 
-The interface uses a 2-cycle protocol for each 8-bit value:
+The interface uses a **2-cycle protocol** for each operation:
 
-1. **Cycle 1**: Transmit lower 4 bits (nibble) of Data_A and Data_B
-2. **Cycle 2**: Transmit upper 4 bits (nibble) of Data_A and Data_B
+**Input Protocol (2 cycles to send 8-bit × 8-bit data):**
+
+1. **Cycle 1**: Send lower nibbles of Data_A and Data_B
+2. **Cycle 2**: Send upper nibbles of Data_A and Data_B
+
+**Output Protocol (2 cycles to read 16-bit result):**
+
+1. **Cycle 1**: Read lower nibbles of result low and high bytes
+2. **Cycle 2**: Read upper nibbles of result low and high bytes
 
 ### Timing Diagram
 
 ```
-Clock:     ___┌─┐_┌─┐_┌─┐_┌─┐_┌─┐_┌─┐_┌─┐_┌─┐___
-Enable:    ____┌───┐_____________________┌───┐___
-Data_A[3:0]: ──┤ 5 ├─────────────────────┤ 3 ├───
-Data_A[7:4]: ──┤ 0 ├─────────────────────┤ 0 ├───
-Data_B[3:0]: ──┤ 6 ├─────────────────────┤ 4 ├───
-Data_B[7:4]: ──┤ 0 ├─────────────────────┤ 0 ├───
-Clear_Mult:  ──┤ 1 ├─────────────────────┤ 0 ├───
-                │   │                     │   │
-             Cycle 1                   Cycle 1
-           (5*6=30)                   (3*4=12)
-           Clear Mode              Accumulate Mode
+Clock:         ___┌─┐_┌─┐_┌─┐_┌─┐_┌─┐_┌─┐_┌─┐_┌─┐___
+Enable:        ____┌───┐_____________________┌───┐___
+Data_A[3:0]:   ──┤ 5 ├─────────────────────┤ 3 ├───  (Input Port 1)
+Data_B[3:0]:   ──┤ 6 ├─────────────────────┤ 4 ├───  (Input Port 2)
+Clear_Mult:    ──┤ 1 ├─────────────────────┤ 0 ├───
+Result_Low[3:0]:──┤15 ├─────────────────────┤ 4 ├───  (Output Port 1)
+Result_High[3:0]:─┤ 0 ├─────────────────────┤ 1 ├───  (Output Port 2)
+                  │   │                     │   │
+               Cycle 1                   Cycle 1
+           Send: A=0x05, B=0x06      Send: A=0x03, B=0x04
+           Read: Result=0x001E       Read: Result=0x000C
+           (5*6=30, low nibbles)     (3*4=12, low nibbles)
 ```
 
 ## Usage Examples
@@ -48,8 +56,8 @@ Clear_Mult:  ──┤ 1 ├─────────────────�
 
 ```verilog
 // Cycle 1: Send lower nibbles
-ui_in[3:0] = 4'd5;    // Data_A lower nibble
-ui_in[7:4] = 4'd6;    // Data_B lower nibble
+ui_in[3:0] = 4'd5;    // Data_A lower nibble (Input Port 1)
+ui_in[7:4] = 4'd6;    // Data_B lower nibble (Input Port 2)
 uio_in[0] = 1'b1;     // Clear mode
 uio_in[1] = 1'b1;     // Enable
 @(posedge clk);
@@ -65,7 +73,15 @@ uio_in[1] = 1'b1;     // Enable
 uio_in[1] = 1'b0;
 repeat(6) @(posedge clk);
 
-// Result will be available on uo_out nibbles
+// Read result over 2 cycles
+// Cycle 1: Lower nibbles
+result_low_nibble = uo_out[3:0];   // Low byte lower nibble (Output Port 1)
+result_high_nibble = uo_out[7:4];  // High byte lower nibble (Output Port 2)
+@(posedge clk);
+
+// Cycle 2: Upper nibbles
+result_low_upper = uo_out[3:0];    // Low byte upper nibble
+result_high_upper = uo_out[7:4];   // High byte upper nibble
 ```
 
 ### Example 2: Accumulation (Previous + 3 × 4)
@@ -114,18 +130,18 @@ repeat(6) @(posedge clk);
 
 ## Reading Results
 
-Results are output as nibbles that need to be assembled:
+Results are output via **4-bit Output Ports** and need to be assembled over 2 cycles:
 
 ```verilog
-// Read result nibbles over 2 cycles
+// Read result from 4-bit output ports over 2 cycles
 // Cycle 1: Lower nibbles
-result_low[3:0] = uo_out[3:0];     // Result low byte, lower nibble
-result_high[3:0] = uo_out[7:4];    // Result high byte, lower nibble
+result_low[3:0] = uo_out[3:0];     // Low byte lower nibble (Output Port 1)
+result_high[3:0] = uo_out[7:4];    // High byte lower nibble (Output Port 2)
 overflow = uio_out[0];
 
 // Cycle 2: Upper nibbles
-result_low[7:4] = uo_out[3:0];     // Result low byte, upper nibble
-result_high[7:4] = uo_out[7:4];    // Result high byte, upper nibble
+result_low[7:4] = uo_out[3:0];     // Low byte upper nibble (Output Port 1)
+result_high[7:4] = uo_out[7:4];    // High byte upper nibble (Output Port 2)
 
 // Assemble 16-bit result
 final_result = {result_high, result_low};
@@ -167,10 +183,11 @@ After sending data via nibble interface, wait 4-6 clock cycles before reading re
 
 ## Benefits
 
-1. **I/O Efficiency**: Reduces required pins from 16 to 8 for data
-2. **Expandability**: Frees up 8 I/O pins for additional features
-3. **Compatibility**: Maintains full MAC functionality
-4. **Flexibility**: Allows future expansion with signed arithmetic, DMA, etc.
+1. **I/O Efficiency**: Uses only 4 dedicated 4-bit ports for complete data transfer
+2. **Clear Interface**: 4 independent single-direction ports with well-defined functions
+3. **Expandability**: Efficient use of TinyTapeout's limited I/O pins
+4. **Compatibility**: Maintains full MAC functionality with complete 16-bit result access
+5. **Flexibility**: Allows future expansion with additional control signals
 
 ## Limitations
 
