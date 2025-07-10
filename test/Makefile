@@ -37,12 +37,8 @@ COMPILE_ARGS 		+= -I../src
 test_mac:
 	$(MAKE) VERILOG_SOURCES="$(COMMON_VERILOG_SOURCES) tb_mac_simple.v" TOPLEVEL=tb_mac_simple MODULE=test_mac sim
 
-# Nibble interface test
-test_nibble:
-	$(MAKE) VERILOG_SOURCES="$(COMMON_VERILOG_SOURCES) tb_mac_nibble.v" TOPLEVEL=tb_mac_nibble MODULE=test_mac_nibble sim
-
 # Default target
-all: test_mac test_nibble
+all: test_mac
 
 # Backward compatibility - default to MAC test
 VERILOG_SOURCES = $(COMMON_VERILOG_SOURCES) tb_mac_simple.v

@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-module tb_mac_nibble;
+module tb_mac_simple;
     reg clk;
     reg rst_n;
     
@@ -36,7 +36,7 @@ module tb_mac_nibble;
         
         // Generate VCD for waveform viewing
         $dumpfile("mac_nibble_test.vcd");
-        $dumpvars(0, tb_mac_nibble);
+        $dumpvars(0, tb_mac_simple);
         
         // Let cocotb control the rest of the simulation
     end
