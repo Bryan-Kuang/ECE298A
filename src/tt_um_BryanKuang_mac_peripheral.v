@@ -16,16 +16,14 @@ module tt_um_BryanKuang_mac_peripheral (
     input  wire       rst_n     // reset_n - low to reset
 );
 
-  // Nibble interface pin mapping - 4 independent 4-bit serial ports
-  wire [3:0] data_a_nibble = ui_in[3:0];             // Data_A 4-bit input port
-  wire [3:0] data_b_nibble = ui_in[7:4];             // Data_B 4-bit input port
-  wire clear_and_mult = uio_in[0];                   // Clear and multiply control
-  wire enable_nibble = uio_in[1];                    // Enable nibble interface
+  // 2-cycle 8-bit serial interface pin mapping
+  wire [7:0] data_input = ui_in[7:0];                // 8-bit data input (Data A in cycle 1, Data B in cycle 2)
+  wire clear_and_mult = uio_in[0];                   // Clear and multiply control (valid in cycle 1)
+  wire enable_interface = uio_in[1];                 // Enable interface
   
-  // Nibble interface outputs - 4 independent 4-bit serial ports
-  wire [3:0] result_low_nibble;                      // Result low 4-bit output port
-  wire [3:0] result_high_nibble;                     // Result high 4-bit output port
-  wire overflow_nibble;
+  // 2-cycle 8-bit serial interface outputs
+  wire [7:0] data_output;                            // 8-bit data output (low 8 bits in cycle 1, high 8 bits in cycle 2)
+  wire overflow_flag;
   wire data_ready;
   
   // MAC interface signals
@@ -45,17 +43,15 @@ module tt_um_BryanKuang_mac_peripheral (
   wire [15:0] mult_result;
   wire [16:0] accumulator_value;
   
-  // Nibble interface module
-  nibble_interface nibble_if (
+  // 2-cycle 8-bit serial interface module
+  nibble_interface serial_if (
     .clk(clk),
     .rst(~rst_n),
-    .enable(enable_nibble),
-    .data_a_nibble_in(data_a_nibble),
-    .data_b_nibble_in(data_b_nibble),
+    .enable(enable_interface),
+    .data_in(data_input),
     .clear_and_mult_in(clear_and_mult),
-    .result_low_nibble_out(result_low_nibble),
-    .result_high_nibble_out(result_high_nibble),
-    .overflow_out(overflow_nibble),
+    .data_out(data_output),
+    .overflow_out(overflow_flag),
     .data_ready(data_ready),
     .mac_data_a(mac_data_a),
     .mac_data_b(mac_data_b),
@@ -122,11 +118,10 @@ module tt_um_BryanKuang_mac_peripheral (
     .overflow_out(mac_overflow)
   );
   
-  // Output mapping - 4 independent 4-bit serial ports
-  assign uo_out[3:0] = result_low_nibble;            // Result low 4-bit port
-  assign uo_out[7:4] = result_high_nibble;           // Result high 4-bit port
+  // Output mapping - 2-cycle 8-bit serial interface
+  assign uo_out[7:0] = data_output;                  // 8-bit data output (cycles between low/high 8 bits)
   assign uio_oe[7:0] = 8'b11111100;                  // uio[7:2] as outputs, uio[1:0] as inputs
-  assign uio_out[0] = overflow_nibble;               // Overflow flag output
+  assign uio_out[0] = overflow_flag;                 // Overflow flag output
   assign uio_out[1] = data_ready;                    // Data ready flag output
   assign uio_out[7:2] = 6'b0;                        // Unused outputs
 
