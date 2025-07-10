@@ -6,23 +6,21 @@ project:
   description: "An 8×8→16-bit multiply-accumulate unit with 4-bit nibble serial input/output interface, featuring overflow detection and 17-bit internal accumulation" # One line description of what your project does
   language: "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
   clock: "10 MHz" # Clock frequency
+  tiles: "1x1" # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 6x2 or 8x2
 
-# How many tiles your design occupies? A single tile is about 160 x 100 um.
-tiles: "1x1" # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 6x2 or 8x2
+  # Your top module name must start with "tt_um_". Make it unique by including your github username:
+  top_module: "tt_um_BryanKuang_mac_peripheral"
 
-# Your top module name must start with "tt_um_". Make it unique by including your github username:
-top_module: "tt_um_BryanKuang_mac_peripheral"
-
-# List your project's source files here.
-source_files:
-  - tt_um_BryanKuang_mac_peripheral.v
-  - MAC_simple.v
-  - nibble_interface.v
-  - components/input_registers.v
-  - components/change_detector.v
-  - components/pipeline_registers.v
-  - components/accumulator_17bit.v
-  - builtin_components/TC_Mul.v
+  # List your project's source files here.
+  source_files:
+    - tt_um_BryanKuang_mac_peripheral.v
+    - MAC_simple.v
+    - nibble_interface.v
+    - components/input_registers.v
+    - components/change_detector.v
+    - components/pipeline_registers.v
+    - components/accumulator_17bit.v
+    - builtin_components/TC_Mul.v
 
 # The pinout of your project. Leave unused pins blank. Many GPIO pins can be used as analog pins.
 pinout:
