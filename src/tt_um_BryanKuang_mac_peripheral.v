@@ -20,6 +20,7 @@ module tt_um_BryanKuang_mac_peripheral (
   wire [7:0] data_input = ui_in[7:0];                // 8-bit data input (Data A in cycle 1, Data B in cycle 2)
   wire clear_and_mult = uio_in[0];                   // Clear and multiply control (valid in cycle 1)
   wire enable_interface = uio_in[1];                 // Enable interface
+  wire signed_mode = uio_in[2];                      // Signed mode control (when 1, treat inputs/outputs as signed)
   
   // 2-cycle 8-bit serial interface outputs
   wire [7:0] data_output;                            // 8-bit data output (low 8 bits in cycle 1, high 8 bits in cycle 2)
@@ -28,17 +29,17 @@ module tt_um_BryanKuang_mac_peripheral (
   
   // MAC interface signals
   wire [7:0] mac_data_a, mac_data_b;
-  wire mac_clear_and_mult;
+  wire mac_clear_and_mult, mac_signed_mode;
   wire [15:0] mac_result;
   wire mac_overflow;
   
   // Internal MAC signals
   wire input_changed;
   wire [7:0] reg_A, reg_B;
-  wire reg_Clear_and_Mult;
+  wire reg_Clear_and_Mult, reg_signed_mode;
   wire reg_valid;
   wire [7:0] pipe_A, pipe_B;
-  wire pipe_Clear_and_Mult;
+  wire pipe_Clear_and_Mult, pipe_signed_mode;
   wire pipe_valid;
   wire [15:0] mult_result;
   wire [16:0] accumulator_value;
@@ -50,12 +51,14 @@ module tt_um_BryanKuang_mac_peripheral (
     .enable(enable_interface),
     .data_in(data_input),
     .clear_and_mult_in(clear_and_mult),
+    .signed_mode(signed_mode),
     .data_out(data_output),
     .overflow_out(overflow_flag),
     .data_ready(data_ready),
     .mac_data_a(mac_data_a),
     .mac_data_b(mac_data_b),
     .mac_clear_and_mult(mac_clear_and_mult),
+    .mac_signed_mode(mac_signed_mode),
     .mac_result(mac_result),
     .mac_overflow(mac_overflow)
   );
@@ -78,10 +81,12 @@ module tt_um_BryanKuang_mac_peripheral (
     .data_b_in(mac_data_b),
     .clear_mult_in(mac_clear_and_mult),
     .valid_in(input_changed),
+    .signed_mode_in(mac_signed_mode),
     .data_a_out(reg_A),
     .data_b_out(reg_B),
     .clear_mult_out(reg_Clear_and_Mult),
-    .valid_out(reg_valid)
+    .valid_out(reg_valid),
+    .signed_mode_out(reg_signed_mode)
   );
   
   // Stage 2: Pipeline registers
@@ -92,18 +97,20 @@ module tt_um_BryanKuang_mac_peripheral (
     .data_b_in(reg_B),
     .clear_mult_in(reg_Clear_and_Mult),
     .valid_in(reg_valid),
+    .signed_mode_in(reg_signed_mode),
     .data_a_out(pipe_A),
     .data_b_out(pipe_B),
     .clear_mult_out(pipe_Clear_and_Mult),
-    .valid_out(pipe_valid)
+    .valid_out(pipe_valid),
+    .signed_mode_out(pipe_signed_mode)
   );
   
-  // 8x8 Multiplier
-  TC_Mul #(.BIT_WIDTH(8)) multiplier (
+  // Configurable 8x8 Multiplier (signed/unsigned)
+  configurable_multiplier multiplier (
     .in0(pipe_A),
     .in1(pipe_B),
-    .out0(mult_result[7:0]),
-    .out1(mult_result[15:8])
+    .signed_mode(pipe_signed_mode),
+    .result(mult_result)
   );
   
   // 17-bit accumulator
@@ -113,6 +120,7 @@ module tt_um_BryanKuang_mac_peripheral (
     .mult_result(mult_result),
     .clear_mode(pipe_Clear_and_Mult),
     .valid(pipe_valid),
+    .signed_mode(pipe_signed_mode),
     .accumulator_value(accumulator_value),
     .result_out(mac_result),
     .overflow_out(mac_overflow)
@@ -126,6 +134,6 @@ module tt_um_BryanKuang_mac_peripheral (
   assign uio_out[7:2] = 6'b0;                        // Unused outputs
 
   // Suppress unused signal warnings
-  wire _unused = &{ena, uio_in[7:2], accumulator_value, 1'b0};
+  wire _unused = &{ena, uio_in[7:3], accumulator_value, 1'b0};
 
 endmodule 

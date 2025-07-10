@@ -8,7 +8,7 @@ SRC_DIR := /Users/bryan/Library/CloudStorage/OneDrive-UniversityofWaterloo/Water
 PROJECT_SOURCES = tt_um_BryanKuang_mac_peripheral.v nibble_interface.v components/input_registers.v components/change_detector.v components/pipeline_registers.v components/accumulator_17bit.v builtin_components/TC_Mul.v
 
 # Common Verilog sources (without testbench)
-COMMON_VERILOG_SOURCES = ../src/tt_um_BryanKuang_mac_peripheral.v ../src/nibble_interface.v ../src/components/input_registers.v ../src/components/change_detector.v ../src/components/pipeline_registers.v ../src/components/accumulator_17bit.v ../src/builtin_components/TC_Mul.v
+COMMON_VERILOG_SOURCES = ../src/tt_um_BryanKuang_mac_peripheral.v ../src/nibble_interface.v ../src/MAC_simple.v ../src/components/input_registers.v ../src/components/change_detector.v ../src/components/pipeline_registers.v ../src/components/accumulator_17bit.v ../src/builtin_components/TC_Mul.v
 
 ifneq ($(GATES),yes)
 
