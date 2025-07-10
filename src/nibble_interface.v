@@ -27,7 +27,6 @@ module nibble_interface (
     reg [7:0] assembled_data_a;         // Complete Data A for MAC
     reg [7:0] assembled_data_b;         // Complete Data B for MAC
     reg assembled_clear_mult;           // Complete control signal for MAC
-    reg data_valid;                     // Signal to MAC that data is ready
     
     // Output state machine for 2-cycle output protocol  
     reg output_cycle_state;             // 0 = cycle 1 (low 8 bits + overflow), 1 = cycle 2 (high 8 bits)
@@ -44,14 +43,12 @@ module nibble_interface (
             assembled_data_a <= 8'b0;
             assembled_data_b <= 8'b0;
             assembled_clear_mult <= 1'b0;
-            data_valid <= 1'b0;
         end else begin
             if (enable) begin
                 if (input_cycle_state == 1'b0) begin
                     // Cycle 1: Store Data A and control signal
                     stored_data_a <= data_in;
                     stored_clear_mult <= clear_and_mult_in;
-                    data_valid <= 1'b0;
                     input_cycle_state <= 1'b1;
                     // Mark that new input started, previous result becomes invalid
                     result_available <= 1'b0;
@@ -60,13 +57,8 @@ module nibble_interface (
                     assembled_data_a <= stored_data_a;
                     assembled_data_b <= data_in;           // data_in is Data B in cycle 2
                     assembled_clear_mult <= stored_clear_mult;
-                    data_valid <= 1'b1;
                     input_cycle_state <= 1'b0;
                 end
-            end else begin
-                // Keep data_valid high for one clock after enable goes low 
-                // to ensure change_detector sees the new data
-                data_valid <= 1'b0;
             end
         end
     end
