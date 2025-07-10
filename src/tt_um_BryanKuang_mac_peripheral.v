@@ -131,6 +131,6 @@ module tt_um_BryanKuang_mac_peripheral (
   assign uio_out[7:2] = 6'b0;                        // Unused outputs
 
   // Suppress unused signal warnings
-  wire _unused = &{ena, uio_in[7:2], 1'b0};
+  wire _unused = &{ena, uio_in[7:2], accumulator_value, 1'b0};
 
 endmodule 
