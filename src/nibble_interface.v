@@ -34,16 +34,27 @@ module nibble_interface (
     reg overflow_reg;                   // Stored overflow flag
     reg result_available;               // Flag indicating result is ready for output
     
-    // Input protocol: 2-cycle input handling
+    // Combined input/output protocol handling
     always @(posedge clk or posedge rst) begin
         if (rst) begin
+            // Input state machine reset
             input_cycle_state <= 1'b0;
             stored_data_a <= 8'b0;
             stored_clear_mult <= 1'b0;
             assembled_data_a <= 8'b0;
             assembled_data_b <= 8'b0;
             assembled_clear_mult <= 1'b0;
+            // Output state machine reset
+            output_cycle_state <= 1'b0;
+            result_reg <= 16'b0;
+            overflow_reg <= 1'b0;
+            result_available <= 1'b0;
         end else begin
+            // Always capture the latest MAC result
+            result_reg <= mac_result;
+            overflow_reg <= mac_overflow;
+            
+            // Input protocol: 2-cycle input handling
             if (enable) begin
                 if (input_cycle_state == 1'b0) begin
                     // Cycle 1: Store Data A and control signal
@@ -59,35 +70,14 @@ module nibble_interface (
                     assembled_clear_mult <= stored_clear_mult;
                     input_cycle_state <= 1'b0;
                 end
-            end
-        end
-    end
-    
-    // Output protocol: Capture and cycle through result
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
-            output_cycle_state <= 1'b0;
-            result_reg <= 16'b0;
-            overflow_reg <= 1'b0;
-            result_available <= 1'b0;
-        end else begin
-            // Always capture the latest MAC result
-            result_reg <= mac_result;
-            overflow_reg <= mac_overflow;
-            
-            // Manage output cycling when not actively inputting
-            if (!enable) begin
+            end else begin
+                // Output protocol: Manage output cycling when not actively inputting
                 if (!result_available) begin
                     result_available <= 1'b1;
                     output_cycle_state <= 1'b0;    // Start from cycle 1 (low 8 bits)
                 end else begin
                     // Advance output cycle to show different parts of result
                     output_cycle_state <= ~output_cycle_state;
-                end
-            end else begin
-                // Reset availability when new input starts
-                if (input_cycle_state == 1'b0) begin
-                    result_available <= 1'b0;
                 end
             end
         end
