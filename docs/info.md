@@ -9,126 +9,136 @@ You can also include images in this folder and reference them in the markdown. E
 
 ## How it works
 
-This project implements an 8×8→16-bit Multiply-Accumulate (MAC) peripheral with overflow detection, designed for digital signal processing applications using a 4-bit nibble serial interface.
+This project is an 8×8→16‑bit Multiply–Accumulate (MAC) peripheral designed for the TinyTapeout platform. It is ideal for DSP applications or any design requiring efficient, repeated multiplication and addition.
 
-### Architecture Overview
-
-The MAC peripheral consists of three main components:
-
-1. **8×8 Multiplier (TC_Mul.v)**: Performs unsigned 8-bit × 8-bit multiplication, producing a 16-bit result
-2. **17-bit Accumulator**: Stores and accumulates multiplication results with overflow detection
-3. **3-Stage Pipeline**: Ensures stable operation with 4-cycle latency
-4. **4-bit Nibble Serial Interface**: Enables data transmission using 4 independent 4-bit ports
-
-### Serial Interface Design
-
-The design uses **4 independent single-direction 4-bit serial ports**:
-
-**Input Ports (2 × 4-bit):**
-
-- `ui_in[3:0]`: Data_A nibble port
-- `ui_in[7:4]`: Data_B nibble port
-
-**Output Ports (2 × 4-bit):**
-
-- `uo_out[3:0]`: Result low byte nibble port
-- `uo_out[7:4]`: Result high byte nibble port
-
-### Operation Modes
-
-- **Clear Mode** (`Clear_and_Mult = 1`): Replaces accumulator value with new multiplication result
-- **Accumulate Mode** (`Clear_and_Mult = 0`): Adds new multiplication result to existing accumulator value
-
-### Pipeline Stages
-
-1. **Stage 1**: Input capture and validation
-2. **Stage 2**: 8×8 multiplication using TC_Mul component
-3. **Stage 3**: Accumulation and overflow detection
-
-### TinyTapeout Interface
-
-**Input Pins:**
-
-- `ui_in[3:0]`: Data_A nibble (4-bit)
-- `ui_in[7:4]`: Data_B nibble (4-bit)
-- `uio_in[0]`: Clear_and_Mult control signal
-- `uio_in[1]`: Enable signal for nibble interface
-
-**Output Pins:**
-
-- `uo_out[3:0]`: Result low byte nibble (4-bit)
-- `uo_out[7:4]`: Result high byte nibble (4-bit)
-- `uio_out[0]`: Overflow flag
-- `uio_out[1]`: Data ready flag
-
-### Data Transmission Protocol
-
-The interface uses a 2-cycle protocol for each operation:
-
-**Input (2 cycles to send 8-bit × 8-bit data):**
-
-1. **Cycle 1**: Send lower nibbles of Data_A and Data_B
-2. **Cycle 2**: Send upper nibbles of Data_A and Data_B
-
-**Output (2 cycles to read 16-bit result):**
-
-1. **Cycle 1**: Read lower nibbles of result low and high bytes
-2. **Cycle 2**: Read upper nibbles of result low and high bytes
+To fit within the limited I/O of TinyTapeout, the MAC core uses a **2‑cycle 8‑bit serial interface**. This allows two 8-bit operands to be sent to the core and a full 16‑bit result to be read back, all through a standard 8-bit data bus. The module also supports configurable signed/unsigned arithmetic and provides overflow detection.
 
 ### Key Features
 
-- **50MHz Operation**: Optimized for TinyTapeout's 50MHz clock
-- **Overflow Detection**: 17-bit internal accumulator detects 16-bit overflow
-- **Low Latency**: 4-cycle pipeline provides deterministic timing
-- **Compact Design**: Fits in single 1×1 TinyTapeout tile
-- **4-bit Serial Interface**: Efficient use of limited I/O pins
+- **Compact MAC Core**: Provides a full 8x8 MAC unit with a 17-bit accumulator and overflow detection.
+- **2-Cycle Serial Interface**: A simple 2‑cycle input/output protocol allows full 16-bit operations using only 8-bit data ports, making it easy to integrate with microcontrollers or other hosts.
+- **Signed/Unsigned Support**: A dedicated control pin (`signed_mode`) allows switching between signed and unsigned arithmetic.
+- **High-Speed Operation**: Maintains full 50 MHz operation with a deterministic 4‑cycle pipeline latency.
 
-## How to test
+### Architecture
 
-### Basic Operation Test
+The peripheral's architecture is a 4-stage pipeline designed for stable, high-speed operation:
 
-1. **Reset the design**: Assert reset for several clock cycles
-2. **Set inputs** (2-cycle protocol):
-   - **Cycle 1**: `ui_in[3:0] = 0x5` (Data_A lower), `ui_in[7:4] = 0x3` (Data_B lower), `uio_in[1] = 1` (Enable), `uio_in[0] = 1` (Clear mode)
-   - **Cycle 2**: `ui_in[3:0] = 0x0` (Data_A upper), `ui_in[7:4] = 0x0` (Data_B upper), `uio_in[1] = 1` (Enable), `uio_in[0] = 1` (Clear mode)
-3. **Wait 4 cycles**: Allow pipeline to complete
-4. **Read result** (2-cycle protocol):
-   - **Cycle 1**: `uo_out[3:0] = 0xF` (result low byte lower nibble), `uo_out[7:4] = 0x0` (result high byte lower nibble)
-   - **Cycle 2**: `uo_out[3:0] = 0x0` (result low byte upper nibble), `uo_out[7:4] = 0x0` (result high byte upper nibble)
-   - Expected: 5×3 = 15 (0x000F)
+1. **Input Stage & Serial Interface**: Captures and assembles the two 8‑bit operands and control signals over two clock cycles. A change detector triggers the pipeline only when new, stable data is available.
+2. **Pipeline Register Stage**: Registers the inputs for timing closure and passes the `signed_mode` setting to the multiplier and accumulator.
+3. **Multiplier Stage**: A configurable 8×8 block that produces a 16‑bit product, supporting both signed and unsigned modes.
+4. **Accumulator Stage**: A 17‑bit adder with `clear_and_mult` control. It accumulates results and sets an overflow flag if the result exceeds the 16-bit range.
 
-### Accumulation Test
+### Block Diagram
 
-1. **Perform initial multiplication**: 10×10 = 100 (Clear mode)
-2. **Add second multiplication**: +5×5 = 25 (Accumulate mode)
-3. **Verify result**: Total should be 125
+![](https://files.manuscdn.com/user_upload_by_module/markdown/310419663031347111/zXbeUKkcmInOrsEt.png)
 
-### Overflow Test
+## Pinout
 
-1. **Set large values**: 255×255 = 65025 (Clear mode)
-2. **Add more**: +200×200 = 40000 (Accumulate mode)
-3. **Check overflow**: `uio_out[0]` should be 1, indicating overflow
+| Pin           | Direction | Function                                                                    |
+| ------------- | --------- | --------------------------------------------------------------------------- |
+| `ui_in[7:0]`  | Input     | 8-bit Data Bus. Used for Data A (cycle 1) and Data B (cycle 2).             |
+| `uio_in[0]`   | Input     | `clear_and_mult` (0 = accumulate, 1 = clear before multiplying)             |
+| `uio_in[1]`   | Input     | `enable` (Must be high during the 2-cycle input phase)                      |
+| `uio_in[2]`   | Input     | `signed_mode` (0 = unsigned, 1 = signed)                                    |
+| `uo_out[7:0]` | Output    | 8-bit Data Bus. Cycles between the high and low bytes of the 16-bit result. |
+| `uio_out[0]`  | Output    | `overflow` flag (High when an arithmetic overflow occurs)                   |
+| `uio_out[1]`  | Output    | `data_ready` flag (High when a new result is available)                     |
 
-### Test Sequence Example
+## How to Use the MAC
+
+Operating the MAC involves sending two 8-bit operands and control signals over two clock cycles, waiting for the pipeline to process, and then reading the 16-bit result over two subsequent cycles.
+
+### Data Transmission Protocol
+
+**Input Protocol (2 cycles):**
+
+- **Cycle 1**:
+  - Place 8-bit **Data A** on `ui_in[7:0]`.
+  - Set `uio_in[1]` to `1` to **enable** the interface.
+  - Set `uio_in[0]` (`clear_and_mult`) and `uio_in[2]` (`signed_mode`) as needed. These values are only captured on the first cycle.
+- **Cycle 2**:
+  - Place 8-bit **Data B** on `ui_in[7:0]`.
+  - Keep `uio_in[1]` (`enable`) at `1`.
+- After Cycle 2, set `uio_in[1]` (`enable`) to `0` to complete the input operation.
+
+**Output Protocol (2 cycles):**
+
+- After an operation is complete (approx. 4-6 cycles), the `data_ready` flag (`uio_out[1]`) will go high.
+- The 16-bit result is available on `uo_out[7:0]` and cycles between the high and low bytes on every clock edge.
+- **Read Cycle 1**: Capture the **High Byte** (bits 15:8) of the result.
+- **Read Cycle 2**: Capture the **Low Byte** (bits 7:0) of the result.
+- The `overflow` flag is available on `uio_out[0]`.
+
+### Usage Examples
+
+#### Example 1: Basic Multiplication (`5 * 6`)
 
 ```
-Clock 0-3:   Reset active
-Clock 4-5:   Send A=10, B=10, Clear=1 (2 cycles)
-Clock 10:    Result = 100 (10×10) available after pipeline
-Clock 11-12: Send A=5, B=5, Clear=0 (2 cycles)
-Clock 17:    Result = 125 (100+25) available after pipeline
+// 1. Send data to calculate 5 * 6 = 30
+// Cycle 1: Send Data A (5) and control signals (clear=1, signed=0)
+ui_in <= 8'h05;
+uio_in <= 3'b011; // {signed_mode, enable, clear_and_mult}
+
+// Cycle 2: Send Data B (6)
+ui_in <= 8'h06;
+uio_in <= 3'b010; // {signed_mode, enable, clear_and_mult} - only enable matters
+
+// 2. Wait ~4-6 cycles for the pipeline.
+
+// 3. Read the result (30 = 0x001E)
+// Read Cycle 1: uo_out will be 0x00 (High Byte)
+// Read Cycle 2: uo_out will be 0x1E (Low Byte)
+```
+
+#### Example 2: Accumulation (`100 + 25`)
+
+```
+// 1. First, calculate 10 * 10 = 100 with clear_and_mult = 1
+// ... send 10 and 10 ...
+
+// 2. Wait for the operation to complete.
+
+// 3. Next, calculate 5 * 5 = 25 with clear_and_mult = 0 to accumulate
+// Cycle 1: Send Data A (5) and control signals (clear=0, signed=0)
+ui_in <= 8'h05;
+uio_in <= 3'b010; // {signed_mode, enable, clear_and_mult}
+
+// Cycle 2: Send Data B (5)
+ui_in <= 8'h05;
+uio_in <= 3'b010;
+
+// 4. Wait for the pipeline.
+
+// 5. Read the result (125 = 0x007D)
+// Read Cycle 1: uo_out will be 0x00 (High Byte)
+// Read Cycle 2: uo_out will be 0x7D (Low Byte)
+```
+
+#### Example 3: Signed Multiplication (`10 * -5`)
+
+```
+// 1. Send data for 10 * -5 = -50, with signed_mode = 1
+//    -5 in 8-bit two's complement is 0xFB (251)
+// Cycle 1: Send Data A (10) and control signals (clear=1, signed=1)
+ui_in <= 8'h0A;
+uio_in <= 3'b111; // {signed_mode, enable, clear_and_mult}
+
+// Cycle 2: Send Data B (251)
+ui_in <= 8'hFB;
+uio_in <= 3'b110;
+
+// 2. Wait for the pipeline.
+
+// 3. Read the result (-50 = 0xFFCE in 16-bit two's complement)
+// Read Cycle 1: uo_out will be 0xFF (High Byte)
+// Read Cycle 2: uo_out will be 0xCE (Low Byte)
 ```
 
 ## External hardware
 
 No external hardware is required. This is a purely digital design that operates with:
 
-- **Clock**: 50MHz system clock from TinyTapeout
-- **Reset**: Active-low reset signal
-- **Digital I/O**: Standard TinyTapeout pin interface
-
-The design can be tested using:
-
-- Logic analyzer to monitor input/output signals
-- Oscilloscope to verify timing relationships
-- TinyTapeout demo board for interactive testing
+- **Clock**: A 50MHz system clock from the TinyTapeout board.
+- **Reset**: An active-low reset signal.
+- **Digital I/O**: The standard TinyTapeout pin interface for sending operands and control signals.
