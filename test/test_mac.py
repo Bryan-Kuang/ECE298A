@@ -519,64 +519,64 @@ async def test_clear_functionality_after_accumulation(dut):
     
     print("=== Testing Clear Functionality After Accumulation ===")
     
-    # Step 1: 初始累加几轮操作
-    print("Step 1: 初始累加操作")
+    # Step 1: Initial accumulation operations
+    print("Step 1: Initial accumulation operations")
     
-    # 第一次累加：10 * 10 = 100 (清零模式开始)
-    print("第一次: 10 * 10 = 100 (clear_and_mult=1)")
+    # First accumulation: 10 * 10 = 100 (clear mode start)
+    print("First: 10 * 10 = 100 (clear_and_mult=1)")
     await send_data_2cycle_signed(dut, 10, 10, 1, 0)  # clear=1, unsigned
     await wait_mac_pipeline(dut)
     
     result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"累加器状态: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
-    assert result_16bit == 100, f"第一次操作: expected 100, got {result_16bit}"
+    print(f"Accumulator state: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
+    assert result_16bit == 100, f"First operation: expected 100, got {result_16bit}"
     
-    # 第二次累加：100 + (8 * 9) = 172 (累加模式)
-    print("第二次: 8 * 9 = 72 -> 100 + 72 = 172 (clear_and_mult=0)")
+    # Second accumulation: 100 + (8 * 9) = 172 (accumulate mode)
+    print("Second: 8 * 9 = 72 -> 100 + 72 = 172 (clear_and_mult=0)")
     await send_data_2cycle_signed(dut, 8, 9, 0, 0)  # clear=0, unsigned
     await wait_mac_pipeline(dut)
     
     result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"累加器状态: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
-    assert result_16bit == 172, f"第二次操作: expected 172, got {result_16bit}"
+    print(f"Accumulator state: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
+    assert result_16bit == 172, f"Second operation: expected 172, got {result_16bit}"
     
-    # 第三次累加：172 + (7 * 6) = 214 (累加模式)
-    print("第三次: 7 * 6 = 42 -> 172 + 42 = 214 (clear_and_mult=0)")
+    # Third accumulation: 172 + (7 * 6) = 214 (accumulate mode)
+    print("Third: 7 * 6 = 42 -> 172 + 42 = 214 (clear_and_mult=0)")
     await send_data_2cycle_signed(dut, 7, 6, 0, 0)  # clear=0, unsigned
     await wait_mac_pipeline(dut)
     
     result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"累加器状态: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
-    assert result_16bit == 214, f"第三次操作: expected 214, got {result_16bit}"
+    print(f"Accumulator state: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
+    assert result_16bit == 214, f"Third operation: expected 214, got {result_16bit}"
     
-    # Step 2: 现在测试清零功能
-    print("\nStep 2: 测试清零功能")
-    print(f"清零前累加器值: {result_16bit}")
+    # Step 2: Now test clear functionality
+    print("\nStep 2: Testing clear functionality")
+    print(f"Accumulator value before clear: {result_16bit}")
     
-    # 使用清零模式：应该清除之前的214，只保留新的乘积结果
-    print("清零操作: 5 * 4 = 20 (clear_and_mult=1, 应该忽略之前的214)")
+    # Use clear mode: should clear previous 214, only keep new multiplication result
+    print("Clear operation: 5 * 4 = 20 (clear_and_mult=1, should ignore previous 214)")
     await send_data_2cycle_signed(dut, 5, 4, 1, 0)  # clear=1, unsigned
     await wait_mac_pipeline(dut)
     
     result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"清零后结果: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
+    print(f"Result after clear: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
     
-    # 关键验证：结果应该是20，而不是214+20=234
-    assert result_16bit == 20, f"清零操作失败: expected 20, got {result_16bit} (如果是234说明没有清零)"
+    # Key verification: result should be 20, not 214+20=234
+    assert result_16bit == 20, f"Clear operation failed: expected 20, got {result_16bit} (if 234 means no clear)"
     
-    # Step 3: 验证清零后可以正常累加
-    print("\nStep 3: 验证清零后正常累加")
+    # Step 3: Verify normal accumulation after clear
+    print("\nStep 3: Verify normal accumulation after clear")
     
-    # 在清零后的基础上累加
-    print("清零后累加: 20 + (3 * 2) = 26 (clear_and_mult=0)")
+    # Accumulate on cleared base
+    print("Accumulate after clear: 20 + (3 * 2) = 26 (clear_and_mult=0)")
     await send_data_2cycle_signed(dut, 3, 2, 0, 0)  # clear=0, unsigned
     await wait_mac_pipeline(dut)
     
     result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"最终结果: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
-    assert result_16bit == 26, f"清零后累加: expected 26, got {result_16bit}"
+    print(f"Final result: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
+    assert result_16bit == 26, f"Accumulate after clear: expected 26, got {result_16bit}"
     
-    print("✅ 清零功能测试通过！")
+    print("✅ Clear functionality test passed!")
 
 @cocotb.test()
 async def test_clear_functionality_signed_mode(dut):
@@ -587,42 +587,42 @@ async def test_clear_functionality_signed_mode(dut):
     
     print("=== Testing Clear Functionality in Signed Mode ===")
     
-    # Step 1: 有符号模式下的累加
-    print("Step 1: 有符号模式累加")
+    # Step 1: Accumulation in signed mode
+    print("Step 1: Signed mode accumulation")
     
-    # 第一次：10 * 10 = 100 (清零开始)
-    print("第一次: 10 * 10 = 100 (signed, clear_and_mult=1)")
+    # First: 10 * 10 = 100 (clear start)
+    print("First: 10 * 10 = 100 (signed, clear_and_mult=1)")
     await send_data_2cycle_signed(dut, 10, 10, 1, 1)  # clear=1, signed
     await wait_mac_pipeline(dut)
     
     result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"累加器状态: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
-    assert result_16bit == 100, f"第一次操作: expected 100, got {result_16bit}"
+    print(f"Accumulator state: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
+    assert result_16bit == 100, f"First operation: expected 100, got {result_16bit}"
     
-    # 第二次累加：100 + [(-5) * 6] = 70
-    print("第二次: (-5) * 6 = -30 -> 100 - 30 = 70 (signed, clear_and_mult=0)")
+    # Second accumulation: 100 + [(-5) * 6] = 70
+    print("Second: (-5) * 6 = -30 -> 100 - 30 = 70 (signed, clear_and_mult=0)")
     await send_data_2cycle_signed(dut, 251, 6, 0, 1)  # -5=251, clear=0, signed
     await wait_mac_pipeline(dut)
     
     result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"累加器状态: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
-    assert result_16bit == 70, f"第二次操作: expected 70, got {result_16bit}"
+    print(f"Accumulator state: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
+    assert result_16bit == 70, f"Second operation: expected 70, got {result_16bit}"
     
-    # Step 2: 有符号模式下的清零
-    print("\nStep 2: 有符号模式清零测试")
-    print(f"清零前累加器值: {result_16bit}")
+    # Step 2: Clear in signed mode
+    print("\nStep 2: Signed mode clear test")
+    print(f"Accumulator value before clear: {result_16bit}")
     
-    # 使用清零模式，应该清除之前的70
-    print("清零操作: (-3) * (-4) = 12 (signed, clear_and_mult=1)")
+    # Use clear mode, should clear previous 70
+    print("Clear operation: (-3) * (-4) = 12 (signed, clear_and_mult=1)")
     await send_data_2cycle_signed(dut, 253, 252, 1, 1)  # -3=253, -4=252, clear=1, signed
     await wait_mac_pipeline(dut)
     
     result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"清零后结果: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
+    print(f"Result after clear: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
     
-    # 验证：结果应该是12，而不是70+12=82
-    assert result_16bit == 12, f"有符号清零失败: expected 12, got {result_16bit}"
+    # Verification: result should be 12, not 70+12=82
+    assert result_16bit == 12, f"Signed clear failed: expected 12, got {result_16bit}"
     
-    print("✅ 有符号模式清零功能测试通过！")
+    print("✅ Signed mode clear functionality test passed!")
 
     print("✅ Debug test completed") 

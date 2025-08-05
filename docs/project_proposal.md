@@ -70,6 +70,35 @@ This project implements an 8×8→16‑bit Multiply–Accumulate (MAC) periphera
 
 - **Signal Path Debug**: Verify signed_mode signal propagation through the entire pipeline from input to multiplier.
 
+## CocoTB Test Result
+
+## `4600.00ns INFO cocotb.regression test_clear_functionality_signed_mode passed`
+
+### Test Summary Table
+
+| Test Name                                            | Status | Sim Time (ns) | Real Time (s) | Ratio (ns/s) |
+| ---------------------------------------------------- | ------ | ------------- | ------------- | ------------ |
+| test_mac.test_2cycle_serial_interface_basic          | PASS   | 180.00        | 0.00          | 79055.38     |
+| test_mac.test_2cycle_serial_result_readback          | PASS   | 190.00        | 0.00          | 260260.54    |
+| test_mac.test_2cycle_serial_accumulation             | PASS   | 310.00        | 0.00          | 240694.97    |
+| test_mac.test_2cycle_serial_overflow                 | PASS   | 310.00        | 0.00          | 265353.93    |
+| test_mac.test_2cycle_serial_timing                   | PASS   | 310.00        | 0.00          | 196588.18    |
+| test_mac.test_2cycle_output_protocol                 | PASS   | 290.00        | 0.00          | 256451.22    |
+| test_mac.test_signed_basic_multiplication            | PASS   | 430.00        | 0.00          | 272316.28    |
+| test_mac.test_signed_accumulation                    | PASS   | 430.00        | 0.00          | 281628.78    |
+| test_mac.test_signed_overflow                        | PASS   | 430.00        | 0.00          | 261573.71    |
+| test_mac.test_mixed_unsigned_signed_modes            | PASS   | 430.00        | 0.00          | 286641.88    |
+| test_mac.test_debug_signed_mode                      | PASS   | 190.00        | 0.00          | 192445.73    |
+| test_mac.test_clear_functionality_after_accumulation | PASS   | 670.00        | 0.00          | 273443.97    |
+| test_mac.test_clear_functionality_signed_mode        | PASS   | 430.00        | 0.00          | 258092.55    |
+
+---
+
+**TESTS=13** &nbsp;&nbsp;&nbsp; **PASS=13** &nbsp;&nbsp;&nbsp; **FAIL=0** &nbsp;&nbsp;&nbsp; **SKIP=0**  
+**Total Sim Time:** 4600.00 ns &nbsp;&nbsp;&nbsp; **Real Time:** 0.11 s &nbsp;&nbsp;&nbsp; **Ratio:** 42433.43 ns/s
+
+---
+
 # Project Commit Timeline
 
 This timeline traces development from Bryan's first contribution onward. Some later tasks were picked up by Lingfeng as the project grew.Bryan initially built the core modules and overall architecture. Lingfeng later led debugging, documentation, and interface updates.
@@ -116,3 +145,87 @@ d5706ab (2025-07-10, Bryan) - fix: removed the unused signal
 71d56b3 (2025-07-10, Bryan) - feat: add test cases and update Makefile for tb_mac_simple  
 2f99ba4 (2025-07-10, Bryan) - feat: add configurable multiplier and update interfaces for signed operations  
 bbda052 (2025-07-10, Bryan) - fix: added missing source files path
+
+## Timing Report
+
+---
+
+### Path 1
+
+**Startpoint:** `rst_n` _(input port clocked by `clk`)_  
+**Endpoint:** `accumulator/_546_` _(removal check against rising-edge clock `clk`)_  
+**Path Group:** `asynchronous`  
+**Path Type:** `min`
+
+#### Delay Trace
+
+| Delay (ns) | Time (ns) | Description                                              |
+| ---------- | --------- | -------------------------------------------------------- |
+| 0.00       | 0.00      | clock `clk` (rise edge)                                  |
+| 0.00       | 0.00      | clock network delay (ideal)                              |
+| 2.00       | 2.00 ↑    | input external delay                                     |
+| 0.00       | 2.00 ↑    | `rst_n` (in)                                             |
+| 2.05       | 4.05 ↓    | `_3_/Y` (`sky130_fd_sc_hd__clkinv_1`)                    |
+| 0.33       | 4.37 ↑    | `accumulator/_407_/Y` (`sky130_fd_sc_hd__clkinv_1`)      |
+| 0.00       | 4.37 ↑    | `accumulator/_546_/RESET_B` (`sky130_fd_sc_hd__dfrtp_1`) |
+|            | **4.37**  | **Data Arrival Time**                                    |
+
+#### Required Time Trace
+
+| Delay (ns) | Time (ns) | Description                                          |
+| ---------- | --------- | ---------------------------------------------------- |
+| 0.00       | 0.00      | clock `clk` (rise edge)                              |
+| 0.00       | 0.00      | clock network delay (ideal)                          |
+| 0.00       | 0.00      | clock reconvergence pessimism                        |
+|            | 0.00 ↑    | `accumulator/_546_/CLK` (`sky130_fd_sc_hd__dfrtp_1`) |
+| 0.39       | 0.39      | library removal time                                 |
+|            | **0.39**  | **Data Required Time**                               |
+
+#### Slack Calculation
+
+|                    | Value (ns) |
+| ------------------ | ---------- |
+| Data Required Time | 0.39       |
+| Data Arrival Time  | 4.37       |
+| **Slack (MET)**    | **3.98**   |
+
+---
+
+### Path 2
+
+**Startpoint:** `input_regs/_60_` _(rising edge-triggered flip-flop clocked by `clk`)_  
+**Endpoint:** `pipe_regs/_58_` _(rising edge-triggered flip-flop clocked by `clk`)_  
+**Path Group:** `clk`  
+**Path Type:** `min`
+
+#### Delay Trace
+
+| Delay (ns) | Time (ns) | Description                                        |
+| ---------- | --------- | -------------------------------------------------- |
+| 0.00       | 0.00      | clock `clk` (rise edge)                            |
+| 0.00       | 0.00      | clock network delay (ideal)                        |
+| 0.00       | 0.00 ↑    | `input_regs/_60_/CLK` (`sky130_fd_sc_hd__dfrtp_1`) |
+| 0.29       | 0.29 ↑    | `input_regs/_60_/Q` (`sky130_fd_sc_hd__dfrtp_1`)   |
+| 0.00       | 0.29 ↑    | `pipe_regs/_58_/D` (`sky130_fd_sc_hd__dfrtp_1`)    |
+|            | **0.29**  | **Data Arrival Time**                              |
+
+#### Required Time Trace
+
+| Delay (ns) | Time (ns) | Description                                       |
+| ---------- | --------- | ------------------------------------------------- |
+| 0.00       | 0.00      | clock `clk` (rise edge)                           |
+| 0.00       | 0.00      | clock network delay (ideal)                       |
+| 0.00       | 0.00      | clock reconvergence pessimism                     |
+|            | 0.00 ↑    | `pipe_regs/_58_/CLK` (`sky130_fd_sc_hd__dfrtp_1`) |
+| -0.04      | -0.04     | library hold time                                 |
+|            | **-0.04** | **Data Required Time**                            |
+
+#### Slack Calculation
+
+|                    | Value (ns) |
+| ------------------ | ---------- |
+| Data Required Time | -0.04      |
+| Data Arrival Time  | -0.29      |
+| **Slack (MET)**    | **0.33**   |
+
+---
