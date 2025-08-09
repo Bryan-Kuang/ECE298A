@@ -19,7 +19,9 @@ module nibble_interface (
     output wire mac_clear_and_mult,
     output wire mac_signed_mode,        // Pass signed mode to MAC
     input wire [15:0] mac_result,
-    input wire mac_overflow
+    input wire mac_overflow,
+    // Handshake to indicate a full 2-cycle frame has completed (one-cycle pulse)
+    output wire frame_valid
 );
 
     // Input state machine for 2-cycle input protocol
@@ -37,6 +39,10 @@ module nibble_interface (
     reg [15:0] result_reg;              // Stored MAC result
     reg overflow_reg;                   // Stored overflow flag
     reg result_available;               // Flag indicating result is ready for output
+    reg frame_valid_reg;                // One-cycle pulse when a frame completes
+
+    // Drive output port
+    assign frame_valid = frame_valid_reg;
     
     // Combined input/output protocol handling
     always @(posedge clk or posedge rst) begin
@@ -55,6 +61,7 @@ module nibble_interface (
             result_reg <= 16'b0;
             overflow_reg <= 1'b0;
             result_available <= 1'b0;
+            frame_valid_reg <= 1'b0;
         end else begin
             // Always capture the latest MAC result
             result_reg <= mac_result;
@@ -70,6 +77,8 @@ module nibble_interface (
                     input_cycle_state <= 1'b1;
                     // Mark that new input started, previous result becomes invalid
                     result_available <= 1'b0;
+                    // No frame completion on cycle 1
+                    frame_valid_reg <= 1'b0;
                 end else begin
                     // Cycle 2: Combine with Data B and send to MAC
                     assembled_data_a <= stored_data_a;
@@ -77,15 +86,19 @@ module nibble_interface (
                     assembled_clear_mult <= stored_clear_mult;
                     assembled_signed_mode <= stored_signed_mode;
                     input_cycle_state <= 1'b0;
+                    // Pulse valid for one cycle when a full 2-cycle frame is assembled
+                    frame_valid_reg <= 1'b1;
                 end
             end else begin
                 // Output protocol: Manage output cycling when not actively inputting
                 if (!result_available) begin
                     result_available <= 1'b1;
                     output_cycle_state <= 1'b0;    // Start from cycle 1 (low 8 bits)
+                    frame_valid_reg <= 1'b0;
                 end else begin
                     // Advance output cycle to show different parts of result
                     output_cycle_state <= ~output_cycle_state;
+                    frame_valid_reg <= 1'b0;
                 end
             end
         end

@@ -1,6 +1,6 @@
 read_verilog src/nibble_interface.v
 read_verilog src/MAC_simple.v
-read_verilog src/components/accumulator_17bit.v
+read_verilog src/components/accumulator_16p1bit.v
 read_verilog src/components/pipeline_registers.v
 read_verilog src/components/input_registers.v
 read_verilog src/components/change_detector.v

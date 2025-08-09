@@ -1,11 +1,11 @@
-module accumulator_17bit (
+module accumulator_16p1bit (
     input wire clk,
     input wire rst,
     input wire [15:0] mult_result,
     input wire clear_mode,
     input wire valid,
-    input wire signed_mode,              // Signed mode control
-    
+    input wire signed_mode,
+
     output reg [16:0] accumulator_value,
     output reg [15:0] result_out,
     output reg overflow_out
@@ -14,19 +14,19 @@ module accumulator_17bit (
     wire [16:0] add_result;
     wire signed_overflow;
     wire unsigned_overflow;
-    
-    // Unsigned addition (existing logic)
+
+    // Unsigned addition
     assign add_result = accumulator_value + {1'b0, mult_result};
     assign unsigned_overflow = add_result[16];
-    
+
     // Signed overflow detection: overflow when signs are same but result sign differs
     wire [16:0] signed_accumulator = {{1{accumulator_value[15]}}, accumulator_value[15:0]};
     wire [16:0] signed_mult = {{1{mult_result[15]}}, mult_result};
     wire [16:0] signed_add_result = signed_accumulator + signed_mult;
-    
-    assign signed_overflow = (signed_accumulator[15] == signed_mult[15]) && 
-                            (signed_add_result[15] != signed_accumulator[15]);
-    
+
+    assign signed_overflow = (signed_accumulator[15] == signed_mult[15]) &&
+                             (signed_add_result[15] != signed_accumulator[15]);
+
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             accumulator_value <= 17'b0;
@@ -51,4 +51,4 @@ module accumulator_17bit (
         end
     end
 
-endmodule 
+endmodule

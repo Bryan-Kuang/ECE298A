@@ -23,8 +23,7 @@ project:
     - "components/input_registers.v"
     - "components/change_detector.v"
     - "components/pipeline_registers.v"
-    - "components/accumulator_17bit.v"
-    - "builtin_components/TC_Mul.v"
+    - "components/accumulator_16p1bit.v"
 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
 pinout:

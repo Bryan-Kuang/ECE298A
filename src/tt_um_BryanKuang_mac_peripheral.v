@@ -26,6 +26,7 @@ module tt_um_BryanKuang_mac_peripheral (
   wire [7:0] data_output;                            // 8-bit data output (low 8 bits in cycle 1, high 8 bits in cycle 2)
   wire overflow_flag;
   wire data_ready;
+  wire frame_valid;                                   // One-cycle pulse when a 2-cycle frame completes
   
   // MAC interface signals
   wire [7:0] mac_data_a, mac_data_b;
@@ -34,7 +35,6 @@ module tt_um_BryanKuang_mac_peripheral (
   wire mac_overflow;
   
   // Internal MAC signals
-  wire input_changed;
   wire [7:0] reg_A, reg_B;
   wire reg_Clear_and_Mult, reg_signed_mode;
   wire reg_valid;
@@ -60,17 +60,8 @@ module tt_um_BryanKuang_mac_peripheral (
     .mac_clear_and_mult(mac_clear_and_mult),
     .mac_signed_mode(mac_signed_mode),
     .mac_result(mac_result),
-    .mac_overflow(mac_overflow)
-  );
-  
-  // Input change detection
-  change_detector change_det (
-    .clk(clk),
-    .rst(~rst_n),
-    .data_a(mac_data_a),
-    .data_b(mac_data_b),
-    .clear_mult(mac_clear_and_mult),
-    .input_changed(input_changed)
+    .mac_overflow(mac_overflow),
+    .frame_valid(frame_valid)
   );
   
   // Stage 1: Input registers
@@ -80,7 +71,7 @@ module tt_um_BryanKuang_mac_peripheral (
     .data_a_in(mac_data_a),
     .data_b_in(mac_data_b),
     .clear_mult_in(mac_clear_and_mult),
-    .valid_in(input_changed),
+    .valid_in(frame_valid),
     .signed_mode_in(mac_signed_mode),
     .data_a_out(reg_A),
     .data_b_out(reg_B),
@@ -113,8 +104,8 @@ module tt_um_BryanKuang_mac_peripheral (
     .result(mult_result)
   );
   
-  // 17-bit accumulator
-  accumulator_17bit accumulator (
+  // 16+1-bit accumulator (17-bit internal)
+  accumulator_16p1bit accumulator (
     .clk(clk),
     .rst(~rst_n),
     .mult_result(mult_result),

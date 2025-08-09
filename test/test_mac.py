@@ -2,6 +2,10 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ClockCycles
 
+# Fixed random test configuration
+TEST_ITER = 1000
+TEST_SEED = 1234567
+
 async def reset_dut(dut):
     """Reset the DUT"""
     dut.rst_n.value = 0
@@ -61,201 +65,147 @@ async def read_full_result_2cycle(dut):
     return result_16bit, overflow, ready
 
 @cocotb.test()
-async def test_2cycle_serial_interface_basic(dut):
+async def test_basic_unsigned(dut):
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
     dut.ena.value = 1
     await reset_dut(dut)
     
-    print("=== Testing 2-Cycle 8-bit Serial Interface Basic Functionality ===")
-    
-    # Test 1: Basic multiplication 5 * 6 = 30 using 2-cycle serial protocol
-    print("Test 1: 5 * 6 = 30 via 2-cycle 8-bit serial interface")
-    await send_data_2cycle(dut, 5, 6, 1)  # Clear mode
-    await wait_mac_pipeline(dut)
-    
-    # Read complete result over 2 cycles
-    result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"Result: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}, ready={ready}")
-    
-    # Expected: 5*6 = 30 = 0x001E
-    assert result_16bit == 30, f"Result mismatch: expected 30, got {result_16bit}"
-    assert overflow == 0, f"Unexpected overflow: {overflow}"
-    
-    print("✅ 2-cycle serial interface basic test passed")
+    import random
+    random.seed(TEST_SEED)
+    for i in range(TEST_ITER):
+        a = random.randrange(0, 256)
+        b = random.randrange(0, 256)
+        await send_data_2cycle(dut, a, b, 1)  # clear mode, unsigned
+        await wait_mac_pipeline(dut)
+        result_16bit, overflow, ready = await read_full_result_2cycle(dut)
+        expected = (a * b) & 0xFFFF
+        assert result_16bit == expected, f"[basic_unsigned] iter={i} a={a} b={b} exp={expected} got={result_16bit}"
+        assert overflow == 0, f"[basic_unsigned] iter={i} overflow unexpected: {overflow}"
 
 @cocotb.test() 
-async def test_2cycle_serial_result_readback(dut):
+async def test_readback(dut):
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
     dut.ena.value = 1
     await reset_dut(dut)
     
-    print("=== Testing 2-Cycle 8-bit Serial Interface Result Readback ===")
-    
-    # Test with a known result: 15 * 17 = 255 = 0x00FF
-    print("Test: 15 * 17 = 255 = 0x00FF")
-    await send_data_2cycle(dut, 15, 17, 1)  # Clear mode
-    await wait_mac_pipeline(dut)
-    
-    # Read complete result over 2 cycles
-    result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"Result: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}, ready={ready}")
-    
-    # Expected: 15*17 = 255 = 0x00FF
-    assert result_16bit == 255, f"Result mismatch: expected 255, got {result_16bit}"
-    assert overflow == 0, f"Unexpected overflow: {overflow}"
-    
-    print("✅ 2-cycle serial result readback test passed")
+    import random
+    random.seed(TEST_SEED)
+    for i in range(TEST_ITER):
+        a = random.randrange(0, 256)
+        b = random.randrange(0, 256)
+        await send_data_2cycle(dut, a, b, 1)
+        await wait_mac_pipeline(dut)
+        # Read two cycles to reconstruct 16-bit
+        result_16bit, overflow, ready = await read_full_result_2cycle(dut)
+        expected = (a * b) & 0xFFFF
+        assert result_16bit == expected, f"[readback] iter={i} a={a} b={b} exp={expected} got={result_16bit}"
+        assert overflow == 0, f"[readback] iter={i} overflow unexpected: {overflow}"
 
 @cocotb.test()
-async def test_2cycle_serial_accumulation(dut):
+async def test_accumulate_unsigned(dut):
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
     dut.ena.value = 1
     await reset_dut(dut)
     
-    print("=== Testing 2-Cycle 8-bit Serial Interface Accumulation ===")
-    
-    # Start with 10 * 10 = 100
-    print("Clear: 10 * 10 = 100")
-    await send_data_2cycle(dut, 10, 10, 1)  # Clear mode
-    await wait_mac_pipeline(dut)
-    
-    result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"After clear: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
-    
-    # Expected: 10*10 = 100 = 0x0064
-    assert result_16bit == 100, f"Clear operation result: expected 100, got {result_16bit}"
-    assert overflow == 0, f"Unexpected overflow in clear: {overflow}"
-    
-    # Accumulate: +5 * 5 = +25 -> 125
-    print("Accumulate: +5 * 5 = +25 -> 125")
-    await send_data_2cycle(dut, 5, 5, 0)  # Accumulate mode
-    await wait_mac_pipeline(dut)
-    
-    result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"After accumulate: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
-    
-    # Expected: 125 = 0x007D
-    assert result_16bit == 125, f"Accumulate operation result: expected 125, got {result_16bit}"
-    assert overflow == 0, f"Unexpected overflow in accumulate: {overflow}"
-    
-    print("✅ 2-cycle serial accumulation test passed")
+    import random
+    random.seed(TEST_SEED)
+    acc = 0
+    for i in range(TEST_ITER):
+        a = random.randrange(0, 256)
+        b = random.randrange(0, 256)
+        clear = 1 if (random.random() < 0.15 or i == 0) else 0
+        await send_data_2cycle(dut, a, b, clear)
+        await wait_mac_pipeline(dut)
+        result_16bit, overflow, _ = await read_full_result_2cycle(dut)
+        prod = (a * b) & 0xFFFF
+        if clear:
+            acc = prod
+        else:
+            acc = (acc + prod) & 0xFFFF
+        assert result_16bit == acc, f"[accumulate_unsigned] iter={i} exp={acc} got={result_16bit}"
 
 @cocotb.test()
-async def test_2cycle_serial_overflow(dut):
+async def test_overflow_unsigned(dut):
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
     dut.ena.value = 1
     await reset_dut(dut)
     
-    print("=== Testing 2-Cycle 8-bit Serial Interface Overflow Detection ===")
-    
-    # Test maximum values: 255 * 255 = 65025 = 0xFE01
-    print("Test: 255 * 255 = 65025")
-    await send_data_2cycle(dut, 255, 255, 1)  # Clear mode
-    await wait_mac_pipeline(dut)
-    
-    result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"Large value result: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
-    
-    # Expected: 255*255 = 65025 = 0xFE01
-    assert result_16bit == 65025, f"Large multiplication result: expected 65025, got {result_16bit}"
-    
-    # Test overflow: add another large value to cause overflow
-    print("Test overflow: +200 * 200 = +40000 -> should overflow")
-    await send_data_2cycle(dut, 200, 200, 0)  # Accumulate mode
-    await wait_mac_pipeline(dut)
-    
-    result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"Overflow test: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
-    
-    # 65025 + 40000 = 105025 > 65535, should overflow
-    assert overflow == 1, f"Overflow flag should be set, but got {overflow}"
-    
-    print("✅ 2-cycle serial overflow test passed")
+    import random
+    random.seed(TEST_SEED)
+    acc = 0
+    for i in range(TEST_ITER):
+        a = random.randrange(0, 256)
+        b = random.randrange(0, 256)
+        clear = 1 if (random.random() < 0.2 or i == 0) else 0
+        await send_data_2cycle(dut, a, b, clear)
+        await wait_mac_pipeline(dut)
+        result_16bit, overflow, _ = await read_full_result_2cycle(dut)
+        prod = (a * b) & 0xFFFF
+        if clear:
+            acc = prod
+        else:
+            acc = (acc + prod) & 0x1FFFF  # 17-bit internal
+        exp_ov = 1 if (acc >> 16) & 1 else 0
+        exp_res = acc & 0xFFFF
+        assert result_16bit == exp_res, f"[overflow_unsigned] iter={i} exp={exp_res} got={result_16bit}"
+        assert overflow == exp_ov, f"[overflow_unsigned] iter={i} ov_exp={exp_ov} ov_got={overflow}"
 
 @cocotb.test()
-async def test_2cycle_serial_timing(dut):
+async def test_back_to_back(dut):
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
     dut.ena.value = 1
     await reset_dut(dut)
     
-    print("=== Testing 2-Cycle 8-bit Serial Interface Timing ===")
-    
-    # Test back-to-back operations
-    print("Back-to-back: 6 * 7 = 42, then +3 * 4 = +12 -> 54")
-    
-    await send_data_2cycle(dut, 6, 7, 1)  # Clear mode
-    await wait_mac_pipeline(dut)
-    
-    result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"First operation: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
-    
-    # Expected: 6*7 = 42 = 0x002A
-    assert result_16bit == 42, f"First operation result: expected 42, got {result_16bit}"
-    assert overflow == 0, f"Unexpected overflow in first operation: {overflow}"
-    
-    await send_data_2cycle(dut, 3, 4, 0)  # Accumulate mode
-    await wait_mac_pipeline(dut)
-    
-    result_16bit, overflow, ready = await read_full_result_2cycle(dut)
-    print(f"Second operation: {result_16bit} (0x{result_16bit:04X}), overflow={overflow}")
-    
-    # Expected: 42 + 12 = 54 = 0x0036
-    assert result_16bit == 54, f"Second operation result: expected 54, got {result_16bit}"
-    assert overflow == 0, f"Unexpected overflow in second operation: {overflow}"
-    
-    print("✅ 2-cycle serial timing test passed")
+    import random
+    random.seed(TEST_SEED)
+    acc = 0
+    for i in range(TEST_ITER):
+        a1 = random.randrange(0, 256)
+        b1 = random.randrange(0, 256)
+        await send_data_2cycle(dut, a1, b1, 1)
+        await wait_mac_pipeline(dut)
+        r1, ov1, _ = await read_full_result_2cycle(dut)
+        acc = (a1 * b1) & 0xFFFF
+        assert r1 == acc and ov1 == 0
+
+        a2 = random.randrange(0, 256)
+        b2 = random.randrange(0, 256)
+        await send_data_2cycle(dut, a2, b2, 0)
+        await wait_mac_pipeline(dut)
+        r2, ov2, _ = await read_full_result_2cycle(dut)
+        acc = (acc + (a2 * b2)) & 0x1FFFF
+        exp2 = acc & 0xFFFF
+        expov2 = 1 if (acc >> 16) & 1 else 0
+        assert r2 == exp2 and ov2 == expov2
 
 @cocotb.test()
-async def test_2cycle_output_protocol(dut):
+async def test_output_bytes(dut):
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
     dut.ena.value = 1
     await reset_dut(dut)
     
-    print("=== Testing 2-Cycle Output Protocol ===")
-    
-    # Test specific result to verify output cycling: 0x1234
-    # We need to find inputs that give us 0x1234 = 4660
-    # Let's use 68 * 68 = 4624 (close) or try to accumulate to get 4660
-    print("Test: Creating result 0x1234 = 4660")
-    await send_data_2cycle(dut, 68, 68, 1)  # 68*68 = 4624
-    await wait_mac_pipeline(dut)
-    
-    # Now accumulate +36 to get 4660
-    await send_data_2cycle(dut, 6, 6, 0)   # +36 = 4660
-    await wait_mac_pipeline(dut)
-    
-    # Test output cycling manually
-    # First read - should be low 8 bits (0x34)
-    low_output, overflow, ready = read_result_2cycle(dut)
-    print(f"Cycle 1 output: 0x{low_output:02X} (should be 0x34)")
-    
-    # Advance clock to get next cycle - should be high 8 bits (0x12)
-    await RisingEdge(dut.clk)
-    high_output, overflow, ready = read_result_2cycle(dut)
-    print(f"Cycle 2 output: 0x{high_output:02X} (should be 0x12)")
-    
-    # Reconstruct 16-bit result
-    reconstructed = (high_output << 8) | low_output
-    print(f"Reconstructed result: 0x{reconstructed:04X}")
-    
-    # Verify the cycling pattern
-    expected_low = 0x34  # Low 8 bits of 4660
-    expected_high = 0x12 # High 8 bits of 4660
-    
-    # Note: The exact result might not be 4660, so let's just verify the cycling works
-    result_16bit, _, _ = await read_full_result_2cycle(dut)
-    expected_low = result_16bit & 0xFF
-    expected_high = (result_16bit >> 8) & 0xFF
-    
-    print(f"Expected cycling: low=0x{expected_low:02X}, high=0x{expected_high:02X}")
-    
-    print("✅ 2-cycle output protocol test passed")
+    import random
+    random.seed(TEST_SEED)
+    for i in range(TEST_ITER):
+        a = random.randrange(0, 256)
+        b = random.randrange(0, 256)
+        await send_data_2cycle(dut, a, b, 1)
+        await wait_mac_pipeline(dut)
+        first, ov1, _ = read_result_2cycle(dut)
+        await RisingEdge(dut.clk)
+        second, ov2, _ = read_result_2cycle(dut)
+        full, ov, _ = await read_full_result_2cycle(dut)
+        low = full & 0xFF
+        high = (full >> 8) & 0xFF
+        assert sorted([first, second]) == sorted([low, high]), (
+            f"[output_bytes] iter={i} bytes mismatch: ({first:02X},{second:02X}) vs expected any order of ({low:02X},{high:02X})")
+        assert ov1 == ov2 == 0
 
 async def send_data_2cycle_signed(dut, data_a, data_b, clear_mult, signed_mode):
     """Send data using new 2-cycle 8-bit serial protocol with signed mode control"""
@@ -286,8 +236,118 @@ def to_signed_16bit(value):
         return value - 65536
     return value
 
+# --------- Randomized testing helpers ---------
+def _bit(val: int, pos: int) -> int:
+    return (val >> pos) & 1
+
+def _mask17(val: int) -> int:
+    return val & 0x1FFFF  # keep 17 bits
+
+def _sign_extend_17_from16(x16: int) -> int:
+    # Extend 16-bit two's complement value to 17 bits by copying bit15 into bit16
+    sign = 1 if (x16 & 0x8000) else 0
+    return (sign << 16) | (x16 & 0xFFFF)
+
+def mac_step_model(acc17: int, a: int, b: int, clear: int, signed_mode: int):
+    """One MAC step software model aligned to RTL accumulator_17bit behavior.
+
+    Returns (new_acc17, result16, overflow_flag)
+    - acc17: 17-bit register value (integer 0..0x1FFFF)
+    - a, b: 8-bit unsigned operands (0..255)
+    - clear: 1 to load current product, 0 to accumulate
+    - signed_mode: 1 for signed arithmetic, 0 for unsigned
+    """
+    if signed_mode:
+        sa = to_signed_8bit(a)
+        sb = to_signed_8bit(b)
+        prod = sa * sb  # Python int (could be negative)
+        prod16 = prod & 0xFFFF  # lower 16 bits like hardware
+        if clear:
+            new_acc17 = _mask17(prod16)
+            result16 = prod16 & 0xFFFF
+            overflow = 0
+        else:
+            signed_acc17 = _sign_extend_17_from16(acc17 & 0xFFFF)
+            signed_mult17 = _sign_extend_17_from16(prod16)
+            add17 = _mask17(signed_acc17 + signed_mult17)
+            overflow = int((_bit(signed_acc17, 15) == _bit(signed_mult17, 15)) and (_bit(add17, 15) != _bit(signed_acc17, 15)))
+            new_acc17 = add17
+            result16 = add17 & 0xFFFF
+        return new_acc17, result16, overflow
+    else:
+        prod = (a & 0xFF) * (b & 0xFF)
+        prod16 = prod & 0xFFFF
+        if clear:
+            new_acc17 = _mask17(prod16)
+            result16 = prod16
+            overflow = 0
+        else:
+            add17 = (acc17 + prod16)
+            overflow = int(_bit(add17, 16) == 1)
+            new_acc17 = _mask17(add17)
+            result16 = new_acc17 & 0xFFFF
+        return new_acc17, result16, overflow
+
 @cocotb.test()
-async def test_signed_basic_multiplication(dut):
+async def test_random_unsigned_mac_1000(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    dut.ena.value = 1
+    await reset_dut(dut)
+
+    import random
+    random.seed(TEST_SEED)
+    print(f"[RAND] test_random_unsigned_mac_1000 SEED={TEST_SEED} ITER={TEST_ITER}")
+
+    acc17 = 0
+    for i in range(TEST_ITER):
+        a = random.randrange(0, 256)
+        b = random.randrange(0, 256)
+        clear = 1 if (random.random() < 0.15 or i == 0) else 0  # 15% clear, ensure first op clears
+        signed_mode = 0
+
+        await send_data_2cycle_signed(dut, a, b, clear, signed_mode)
+        await wait_mac_pipeline(dut)
+        rtl_result, rtl_overflow, _ = await read_full_result_2cycle(dut)
+
+        acc17, mdl_result, mdl_overflow = mac_step_model(acc17, a, b, clear, signed_mode)
+
+        assert rtl_result == mdl_result, (
+            f"[UNSIGNED] iter={i} a={a} b={b} clear={clear} expected={mdl_result} got={rtl_result}")
+        assert rtl_overflow == mdl_overflow, (
+            f"[UNSIGNED] iter={i} a={a} b={b} clear={clear} overflow_expected={mdl_overflow} overflow_got={rtl_overflow}")
+
+@cocotb.test()
+async def test_random_signed_mac_1000(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    dut.ena.value = 1
+    await reset_dut(dut)
+
+    import random
+    random.seed(TEST_SEED)
+    print(f"[RAND] test_random_signed_mac_1000 SEED={TEST_SEED} ITER={TEST_ITER}")
+
+    acc17 = 0
+    for i in range(TEST_ITER):
+        a = random.randrange(0, 256)
+        b = random.randrange(0, 256)
+        clear = 1 if (random.random() < 0.15 or i == 0) else 0
+        signed_mode = 1
+
+        await send_data_2cycle_signed(dut, a, b, clear, signed_mode)
+        await wait_mac_pipeline(dut)
+        rtl_result, rtl_overflow, _ = await read_full_result_2cycle(dut)
+
+        acc17, mdl_result, mdl_overflow = mac_step_model(acc17, a, b, clear, signed_mode)
+
+        assert rtl_result == mdl_result, (
+            f"[SIGNED] iter={i} a={to_signed_8bit(a)} b={to_signed_8bit(b)} clear={clear} "
+            f"expected={to_signed_16bit(mdl_result)} (0x{mdl_result:04X}) got={to_signed_16bit(rtl_result)} (0x{rtl_result:04X})")
+        assert rtl_overflow == mdl_overflow, (
+            f"[SIGNED] iter={i} a={to_signed_8bit(a)} b={to_signed_8bit(b)} clear={clear} "
+            f"overflow_expected={mdl_overflow} overflow_got={rtl_overflow}")
+
+@cocotb.test()
+async def test_signed_basic(dut):
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
     dut.ena.value = 1
@@ -335,7 +395,7 @@ async def test_signed_basic_multiplication(dut):
     print("✅ Signed mode basic multiplication test passed")
 
 @cocotb.test()
-async def test_signed_accumulation(dut):
+async def test_accumulate_signed(dut):
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
     dut.ena.value = 1
@@ -381,7 +441,7 @@ async def test_signed_accumulation(dut):
     print("✅ Signed mode accumulation test passed")
 
 @cocotb.test()
-async def test_signed_overflow(dut):
+async def test_overflow_signed(dut):
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
     dut.ena.value = 1
@@ -428,7 +488,7 @@ async def test_signed_overflow(dut):
     print("✅ Signed mode overflow test passed")
 
 @cocotb.test()
-async def test_mixed_unsigned_signed_modes(dut):
+async def test_mode_compare(dut):
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
     dut.ena.value = 1
@@ -468,7 +528,7 @@ async def test_mixed_unsigned_signed_modes(dut):
     print("✅ Mixed mode test passed")
 
 @cocotb.test()
-async def test_debug_signed_mode(dut):
+async def test_debug_signed(dut):
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
     dut.ena.value = 1
@@ -511,7 +571,7 @@ async def test_debug_signed_mode(dut):
     print("✅ Mixed mode test passed")
 
 @cocotb.test()
-async def test_clear_functionality_after_accumulation(dut):
+async def test_clear_then_accumulate(dut):
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
     dut.ena.value = 1
@@ -579,7 +639,7 @@ async def test_clear_functionality_after_accumulation(dut):
     print("✅ Clear functionality test passed!")
 
 @cocotb.test()
-async def test_clear_functionality_signed_mode(dut):
+async def test_clear_signed(dut):
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     
     dut.ena.value = 1
@@ -626,3 +686,147 @@ async def test_clear_functionality_signed_mode(dut):
     print("✅ Signed mode clear functionality test passed!")
 
     print("✅ Debug test completed") 
+
+# ================= Additional randomized tests per new plan =================
+
+@cocotb.test()
+async def test_protocol_basic_random_unsigned(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    dut.ena.value = 1
+    await reset_dut(dut)
+
+    import random
+    random.seed(TEST_SEED)
+    print(f"[RAND] test_protocol_basic_random_unsigned SEED={TEST_SEED} ITER={TEST_ITER}")
+
+    for i in range(TEST_ITER):
+        a = random.randrange(0, 256)
+        b = random.randrange(0, 256)
+        await send_data_2cycle_signed(dut, a, b, 1, 0)  # clear=1, unsigned
+        await wait_mac_pipeline(dut)
+        rtl_result, rtl_overflow, _ = await read_full_result_2cycle(dut)
+
+        expected = (a * b) & 0xFFFF
+        assert rtl_result == expected, f"[BASIC UNSIGNED] iter={i} a={a} b={b} exp={expected} got={rtl_result}"
+        assert rtl_overflow == 0, f"[BASIC UNSIGNED] iter={i} overflow unexpected: {rtl_overflow}"
+
+@cocotb.test()
+async def test_mode_switch_random(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    dut.ena.value = 1
+    await reset_dut(dut)
+
+    import random
+    random.seed(TEST_SEED)
+    print(f"[RAND] test_mode_switch_random SEED={TEST_SEED} ITER={TEST_ITER}")
+
+    acc17 = 0
+    for i in range(TEST_ITER):
+        a = random.randrange(0, 256)
+        b = random.randrange(0, 256)
+        signed_mode = 1 if random.random() < 0.5 else 0
+        clear = 1 if (random.random() < 0.15 or i == 0) else 0
+
+        await send_data_2cycle_signed(dut, a, b, clear, signed_mode)
+        await wait_mac_pipeline(dut)
+        rtl_result, rtl_overflow, _ = await read_full_result_2cycle(dut)
+
+        acc17, mdl_result, mdl_overflow = mac_step_model(acc17, a, b, clear, signed_mode)
+
+        assert rtl_result == mdl_result, (
+            f"[MODE] iter={i} mode={'S' if signed_mode else 'U'} a={to_signed_8bit(a) if signed_mode else a} "
+            f"b={to_signed_8bit(b) if signed_mode else b} clear={clear} expected={to_signed_16bit(mdl_result) if signed_mode else mdl_result} got={to_signed_16bit(rtl_result) if signed_mode else rtl_result}")
+        assert rtl_overflow == mdl_overflow, (
+            f"[MODE] iter={i} mode={'S' if signed_mode else 'U'} overflow_expected={mdl_overflow} overflow_got={rtl_overflow}")
+
+@cocotb.test()
+async def test_output_protocol_random(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    dut.ena.value = 1
+    await reset_dut(dut)
+
+    import random
+    random.seed(TEST_SEED)
+    print(f"[RAND] test_output_protocol_random SEED={TEST_SEED} ITER={TEST_ITER}")
+
+    acc17 = 0
+    for i in range(TEST_ITER):
+        a = random.randrange(0, 256)
+        b = random.randrange(0, 256)
+        signed_mode = 1 if random.random() < 0.5 else 0
+        clear = 1 if (random.random() < 0.15 or i == 0) else 0
+
+        await send_data_2cycle_signed(dut, a, b, clear, signed_mode)
+        await wait_mac_pipeline(dut)
+
+        # Read two consecutive cycles without assuming order
+        first, ov1, _ = read_result_2cycle(dut)
+        await RisingEdge(dut.clk)
+        second, ov2, _ = read_result_2cycle(dut)
+
+        acc17, mdl_result, mdl_overflow = mac_step_model(acc17, a, b, clear, signed_mode)
+        low = mdl_result & 0xFF
+        high = (mdl_result >> 8) & 0xFF
+
+        assert sorted([first, second]) == sorted([low, high]), (
+            f"[OUT] iter={i} bytes mismatch: got ({first:02X},{second:02X}) expected any order of ({low:02X},{high:02X})")
+        # Overflow should be consistent on both cycles
+        assert ov1 == mdl_overflow and ov2 == mdl_overflow, (
+            f"[OUT] iter={i} overflow mismatch: ({ov1},{ov2}) expected {mdl_overflow}")
+
+@cocotb.test()
+async def test_burst_back_to_back_random(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    dut.ena.value = 1
+    await reset_dut(dut)
+
+    import random
+    random.seed(TEST_SEED)
+    print(f"[RAND] test_burst_back_to_back_random SEED={TEST_SEED} ITER={TEST_ITER}")
+
+    acc17 = 0
+    for i in range(TEST_ITER):
+        burst_len = 1 + (random.randrange(0, 5))  # 1..5
+        for j in range(burst_len):
+            a = random.randrange(0, 256)
+            b = random.randrange(0, 256)
+            signed_mode = 1 if random.random() < 0.5 else 0
+            clear = 1 if (j == 0 or random.random() < 0.1) else 0
+
+            await send_data_2cycle_signed(dut, a, b, clear, signed_mode)
+            await wait_mac_pipeline(dut)
+            rtl_result, rtl_overflow, _ = await read_full_result_2cycle(dut)
+
+            acc17, mdl_result, mdl_overflow = mac_step_model(acc17, a, b, clear, signed_mode)
+            assert rtl_result == mdl_result, f"[BURST] iter={i} step={j} exp={mdl_result} got={rtl_result}"
+            assert rtl_overflow == mdl_overflow, f"[BURST] iter={i} step={j} ov_exp={mdl_overflow} ov_got={rtl_overflow}"
+
+@cocotb.test()
+async def test_overflow_boundary_random(dut):
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    dut.ena.value = 1
+    await reset_dut(dut)
+
+    import random
+    random.seed(TEST_SEED)
+    print(f"[RAND] test_overflow_boundary_random SEED={TEST_SEED} ITER={TEST_ITER}")
+
+    acc17 = 0
+    edge_vals = [0, 1, 2, 254, 255, 127, 128]
+    for i in range(TEST_ITER):
+        # Bias sampling towards edges 50% of the time
+        def samp():
+            return random.choice(edge_vals) if (random.random() < 0.5) else random.randrange(0, 256)
+
+        a = samp()
+        b = samp()
+        signed_mode = 1 if random.random() < 0.5 else 0
+        clear = 1 if (random.random() < 0.2 or i == 0) else 0
+
+        await send_data_2cycle_signed(dut, a, b, clear, signed_mode)
+        await wait_mac_pipeline(dut)
+        rtl_result, rtl_overflow, _ = await read_full_result_2cycle(dut)
+
+        acc17, mdl_result, mdl_overflow = mac_step_model(acc17, a, b, clear, signed_mode)
+        assert rtl_result == mdl_result, f"[EDGE] iter={i} mode={'S' if signed_mode else 'U'} a={a} b={b} exp={mdl_result} got={rtl_result}"
+        assert rtl_overflow == mdl_overflow, f"[EDGE] iter={i} ov_exp={mdl_overflow} ov_got={rtl_overflow}"
